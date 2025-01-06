@@ -28,13 +28,13 @@ jobs:
       - name: Mypy
         run: |
           mkdir -p .mypy_cache
-          hatch run check
+          hatch run types:check
 
       - name: Build package
         run: hatch build
 
       - name: Test package
-        run: hatch run cov-xml
+        run: hatch test --cover
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4

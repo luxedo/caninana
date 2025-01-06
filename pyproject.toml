@@ -34,6 +34,15 @@ Source = "https://github.com/Luiz Eduardo Amaral/caninana"
 [tool.hatch.version]
 path = "src/caninana/__about__.py"
 
+[tool.hatch.envs.hatch-test.scripts]
+run = "pytest{env:HATCH_TEST_ARGS:} {args}"
+run-cov = "coverage run -m pytest{env:HATCH_TEST_ARGS:} {args}"
+cov-combine = [
+  "coverage combine",
+  "coverage xml",
+]
+cov-report = "coverage report"
+
 [tool.hatch.envs.types]
 extra-dependencies = [
   "mypy>=1.0.0",
