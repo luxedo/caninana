@@ -2,6 +2,6 @@
 #
 # SPDX-License-Identifier: MIT
 
-from caninana.caninana import Series
+from lontras.lontras import Series
 
 __all__ = ["Series"]
