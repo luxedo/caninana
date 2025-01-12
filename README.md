@@ -2,6 +2,10 @@
 
 [![PyPI - Version](https://img.shields.io/pypi/v/lontras.svg)](https://pypi.org/project/lontras)
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/lontras.svg)](https://pypi.org/project/lontras)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](https://opensource.org/license/mit)
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/luxedo/lontras/publish.yml)
+![Codecov](https://img.shields.io/codecov/c/github/luxedo/lontras)
+![CodeFactor Grade](https://img.shields.io/codefactor/grade/github/luxedo/lontras)
 
 ---
 
@@ -13,21 +17,48 @@
 > for ease of use and direct integration, lontras encourages you to copy and paste its core
 > components into your code. It's the perfect stand mixer for baking smaller data tasks when
 > bringing out the full industrial equipment of `pandas` is too much.
+>
+> ### TLDR;
+>
+> - Small-scale `DataFrame` operations? `lontras`!
+> - Fast `DataFrame` loading, no dependencies? `lontras`!
+> - Embed `DataFrames` in [MicroPython](https://micropython.org/)? `lontras`!
+> - Use `DataFrames` in the browser ([PyScript](https://pyscript.net/))? `lontras`!
+> - High [Pandas](https://pandas.pydata.org/) compatibility? `lontras`!
 
 ## Table of Contents
 
-- [Core Functionalities](#core-functionalities)
 - [Installation](#installation)
-- [Usage](#usage)
+- [Documentation](#documentation)
+- [Core Functionalities](#core-functionalities)
 - [License](#license)
+
+## Installation
+
+If you prefer to install lontras using pip for easy management and updates, you can do so with the
+following command:
+
+```console
+pip install lontras
+# or
+uv pip install lontras
+```
+
+This will download and install lontras from the Python Package Index (PyPI).
+
+For lightweight projects where you want to avoid external dependencies, you can simply copy the
+source file [src/lontras/lontras.py](src/lontras/lontras.py) into your project directory. This
+allows you to directly use the library functions from your code without any installation.
+
+## Documentation
+
+Check out the API Docs at: ...
 
 ## Core Functionalities:
 
 Lontras prioritizes simplicity and minimal dependencies. It leverages Python's native dictionaries
 (via [UserDict](https://docs.python.org/3/library/collections.html#collections.UserDict)) to offer
 core `DataFrame` and `Series` functionalities without external libraries.
-
-@TODO - Redo after implementation
 
 ### Data Structures:
 
@@ -36,13 +67,14 @@ core `DataFrame` and `Series` functionalities without external libraries.
 
 ### Accessing Data:
 
+- `loc` and `iloc`: Access data by label or by index.
 - Label-based access: Access data using standard dictionary-like syntax (e.g., series['label']).
 - Positional access (slicing): Use slices for location-based access (e.g., series[1:3]).
 - Attribute-based access: For convenient access to all values for a given key, use attribute-based access using **getattr** that dynamically retrieves data based on provided keys or a list of keys.
 
 ### Modifying Data:
 
-- Setting values: Modify existing values or add new entries using standard dictionary-like assignment (e.g., series['label'] = value).
+- Setting values: Modify existing values or add new entries using `loc` or `iloc` assignment (e.g., series.loc['label'] = value).
 - Deleting values: Remove entries using del series['label'].
 - Concatenation: Combine Series or DataFrames vertically or horizontally.
 
@@ -67,49 +99,6 @@ core `DataFrame` and `Series` functionalities without external libraries.
 - Missing Data Handling: Doesn't include dedicated functions for handling missing data. Users can implement their own logic using conditional statements or filtering.
 - Multilevel Indexing: Lacks built-in support for multilevel indexing. However, tuple indexes can be used to achieve similar hierarchical structures.
 - Plotting: Currently doesn't include plotting functionalities. External plotting libraries are recommended for visualization.
-
-## Installation
-
-f you prefer to install lontras using pip for easy management and updates, you can do so with the
-following command:
-
-```console
-pip install lontras
-# or
-uv pip install lontras
-```
-
-This will download and install lontras from the Python Package Index (PyPI).
-
-For lightweight projects where you want to avoid external dependencies, you can simply copy the
-source file [src/lontras/lontras.py](src/lontras/lontras.py) into your project directory. This
-allows you to directly use the library functions from your code without any installation.
-
-## Usage
-
-### `lt.Series`
-
-#### Initialize
-
-#### Access
-
-#### Modify
-
-#### Transform
-
-#### Aggregate
-
-### `lt.DataFrame`
-
-#### Initialize
-
-#### Access
-
-#### Modify
-
-#### Transform
-
-#### Aggregate
 
 ## License
 
