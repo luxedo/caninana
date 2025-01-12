@@ -33,13 +33,15 @@ jobs:
         run: hatch fmt
 
       - name: Mypy
-        run: hatch run check
+        run: |
+          mkdir -p .mypy_cache
+          hatch run types:check
 
       - name: Build package
         run: hatch build
 
       - name: Test package
-        run: hatch run test
+        run: hatch test
 
       - name: Publish package distributions to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
