@@ -56,10 +56,15 @@ extra-dependencies = ["mypy>=1.0.0"]
 check = "mypy --install-types --non-interactive {args:src/lontras tests}"
 
 [tool.hatch.envs.docs]
-extra-dependencies = ["sphinx==8.1.3"]
+extra-dependencies = [
+  "sphinx==8.1.3",
+  "sphinx-autobuild==2024.10.3",
+  "sphinx-rtd-theme==3.0.2",
+]
 
 [tool.hatch.envs.docs.scripts]
-build = "sphinx-build doc _build"
+build = "sphinx-build docs docs/_build"
+autobuild = "sphinx-autobuild docs docs/_build"
 repo-info = "./tools/repo-info.sh | tee docs/_static/repo_info.json" # Calculates repo size and load times
 
 [[tool.mypy.overrides]]
