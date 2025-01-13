@@ -39,7 +39,7 @@ repos:
         pass_filenames: false
       - id: cov
         name: cov
-        entry: hatch run test --cover
+        entry: hatch test --cover --all
         language: python
         types: [python]
         pass_filenames: false

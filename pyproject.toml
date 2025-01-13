@@ -14,11 +14,9 @@ authors = [{ name = "Luiz Eduardo Amaral", email = "luizamaral306@gmail.com" }]
 classifiers = [
   "Development Status :: 4 - Beta",
   "Programming Language :: Python",
-  "Programming Language :: Python :: 3.8",
-  "Programming Language :: Python :: 3.9",
-  "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: Implementation :: CPython",
   "Programming Language :: Python :: Implementation :: PyPy",
   "Intended Audience :: Science/Research",
@@ -45,11 +43,15 @@ run-cov = "coverage run -m pytest{env:HATCH_TEST_ARGS:} {args}"
 cov-combine = ["coverage combine", "coverage xml"]
 cov-report = "coverage report -m"
 
+[[tool.hatch.envs.hatch-test.matrix]]
+python = ["3.13", "3.12", "3.11"]
+
 [tool.hatch.envs.hatch-test]
 extra-dependencies = ["pandas>=2.0.0"]
 
 [tool.hatch.envs.types]
 extra-dependencies = ["mypy>=1.0.0"]
+
 [tool.hatch.envs.types.scripts]
 check = "mypy --install-types --non-interactive {args:src/lontras tests}"
 

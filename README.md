@@ -22,13 +22,13 @@
 
 ## TLDR;
 
-- Small-scale `DataFrame` operations? `lontras`!
-- Fast `DataFrame` loading, no dependencies? `lontras`!
-- Embed `DataFrames` in [MicroPython](https://micropython.org/)? `lontras`!
-- Use `DataFrames` in the browser ([PyScript](https://pyscript.net/))? `lontras`!
-- High [Pandas](https://pandas.pydata.org/) compatibility? `lontras`!
-- 1000x smaller! Pandas+Numpy ~ 120MB; `lontras` ~ 102KB!
-- Loads 20x faster! Pandas ~ 400ms; `lontras` ~ 20ms! <small>[test script](tools/repo-info.sh)</small>
+- **🤏 Small-scale `DataFrame` operations? `lontras`!**
+- **🚀 Fast `DataFrame` loading, no dependencies? `lontras`!**
+- **⚙️ Embed `DataFrames` in [MicroPython](https://micropython.org/)? `lontras`!**
+- **🌐 Use `DataFrames` in the browser ([PyScript](https://pyscript.net/))? `lontras`!**
+- **🤝 High [Pandas](https://pandas.pydata.org/) compatibility? `lontras`!**
+- **📦 1000x smaller! Pandas+Numpy ~ 120MB; `lontras` ~ 102KB!**
+- **⏱️ Loads 20x faster! Pandas ~ 400ms; `lontras` ~ 20ms!** <small>[test script](tools/repo-info.sh)</small>
 
 ## Table of Contents
 
