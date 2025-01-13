@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: MIT
 
+from lontras.__about__ import __version__
 from lontras.lontras import Series
 
-__all__ = ["Series"]
+__all__ = ["__version__", "Series"]

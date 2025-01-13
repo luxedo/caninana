@@ -1,6 +1,6 @@
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.6.0
+    rev: v5.0.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
@@ -10,6 +10,19 @@ repos:
     rev: "v4.0.0-alpha.8"
     hooks:
       - id: prettier
+  - repo: https://github.com/ComPWA/taplo-pre-commit
+    rev: v0.9.3
+    hooks:
+      - id: taplo-format
+  - repo: https://github.com/pecigonzalo/pre-commit-shfmt
+    rev: v2.2.0
+    hooks:
+      - id: shell-fmt
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.10.0.1
+    hooks:
+      - id: shellcheck
+        args: ["--exclude=SC1091"]
   - repo: local
     hooks:
       - id: fmt
@@ -18,18 +31,15 @@ repos:
         language: python
         types: [python]
         pass_filenames: false
-        verbose: true
       - id: check
         name: check
         entry: hatch run types:check
         language: python
         types: [python]
         pass_filenames: false
-        verbose: true
       - id: cov
         name: cov
         entry: hatch run test --cover
         language: python
         types: [python]
         pass_filenames: false
-        verbose: true

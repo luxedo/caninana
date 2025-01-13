@@ -1,0 +1,12 @@
+{
+  "lontras": {
+    "size": "101.6K",
+    "version": "",
+    "import-time": "20ms"
+  },
+  "pandas": {
+    "size": "119.8M",
+    "version": "2.2.3",
+    "import-time": "403ms"
+  }
+}

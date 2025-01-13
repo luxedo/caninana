@@ -19,14 +19,16 @@
 > for ease of use and direct integration, lontras encourages you to copy and paste its core
 > components into your code. It's the perfect stand mixer for baking smaller data tasks when
 > bringing out the full industrial equipment of `pandas` is too much.
->
-> ### TLDR;
->
-> - Small-scale `DataFrame` operations? `lontras`!
-> - Fast `DataFrame` loading, no dependencies? `lontras`!
-> - Embed `DataFrames` in [MicroPython](https://micropython.org/)? `lontras`!
-> - Use `DataFrames` in the browser ([PyScript](https://pyscript.net/))? `lontras`!
-> - High [Pandas](https://pandas.pydata.org/) compatibility? `lontras`!
+
+## TLDR;
+
+- Small-scale `DataFrame` operations? `lontras`!
+- Fast `DataFrame` loading, no dependencies? `lontras`!
+- Embed `DataFrames` in [MicroPython](https://micropython.org/)? `lontras`!
+- Use `DataFrames` in the browser ([PyScript](https://pyscript.net/))? `lontras`!
+- High [Pandas](https://pandas.pydata.org/) compatibility? `lontras`!
+- 1000x smaller! Pandas+Numpy ~ 120MB; `lontras` ~ 102KB!
+- Loads 20x faster! Pandas ~ 400ms; `lontras` ~ 20ms! <small>[test script](tools/repo-info.sh)</small>
 
 ## Table of Contents
 
@@ -54,7 +56,7 @@ allows you to directly use the library functions from your code without any inst
 
 ## Documentation
 
-Check out the API Docs at: ...
+Check out the [API Docs](https://lontras.readthedocs.io/en/latest/).
 
 ## Core Functionalities:
 
