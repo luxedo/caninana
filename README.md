@@ -6,6 +6,7 @@
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/lontras.svg)](https://pypi.org/project/lontras)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](https://opensource.org/license/mit)
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/luxedo/lontras/publish.yml)
+[![pre-commit.ci status](https://results.pre-commit.ci/badge/github/luxedo/lontras/main.svg)](https://results.pre-commit.ci/latest/github/luxedo/lontras/main)
 ![Codecov](https://img.shields.io/codecov/c/github/luxedo/lontras)
 ![CodeFactor Grade](https://img.shields.io/codefactor/grade/github/luxedo/lontras)
 
@@ -97,6 +98,7 @@ core `DataFrame` and `Series` functionalities without external libraries.
 
 ### Limitations & Trade-offs: (Same as before)
 
+- No `dtype`! You ask for a sum, `lontras` will try to sum and may raise an exception if an unexpcted value is found.
 - Specialized Data Handling: Lontras focuses on core functionalities and doesn't include specialized functions for datetime, strings, or categorical data. However, users can achieve similar behavior through apply and map functions.
 - Statistical Functions: Limited set of statistical functions. Lontras relies primarily on Python's built-in statistics module.
 - Data Import/Export: Supports limited import/export formats. External libraries might be necessary for complex file handling.

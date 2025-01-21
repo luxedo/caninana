@@ -2,7 +2,6 @@
 #
 # SPDX-License-Identifier: MIT
 
-import re
 import statistics
 from types import MappingProxyType
 
@@ -12,6 +11,8 @@ import pytest
 
 import lontras as lt
 
+from .assertions import assert_exception, assert_series_equal_pandas
+
 example_dict = MappingProxyType({"a": 1, "b": 2, "c": 3})
 example_index = tuple(example_dict.keys())
 example_values = tuple(example_dict.values())
@@ -19,79 +20,103 @@ example_dict_a = MappingProxyType({"a": 1, "b": 2, "c": 3})
 example_dict_b = MappingProxyType({"a": 4, "b": 5, "c": 6})
 example_dict_no_keys = MappingProxyType({0: 1, 1: 2, 2: 3})
 example_scalar = 3
+example_name = "snake"
+example_dict_series_str = """a  1
+b  2
+c  3
+name: None
+"""
+example_dict_series_with_name_str = """a  1
+b  2
+c  3
+name: snake
+"""
 
 
-class TestInit:
-    def test_init_0(self):
+class TestSeriesInit:
+    def test_init_empty(self):
         s = lt.Series()
         ps = pd.Series()
-        assert (s == ps).all()
+        assert_series_equal_pandas(s, ps)
 
-    def test_init_1(self):
-        s = lt.Series(example_dict.values(), index=example_index)
-        ps = pd.Series(example_dict.values(), index=example_index)
-        assert (s == ps).all()
-
-    def test_init_2(self):
+    def test_init_mapping(self):
         s = lt.Series(example_dict)
         ps = pd.Series(example_dict)
-        assert (s == ps).all()
+        assert_series_equal_pandas(s, ps)
 
-    def test_init_3(self):
+    def test_init_collection_with_index(self):
+        s = lt.Series(example_dict.values(), index=example_index)
+        ps = pd.Series(example_dict.values(), index=example_index)
+        assert_series_equal_pandas(s, ps)
+
+    def test_init_collection(self):
         s = lt.Series(tuple(example_dict.values()))
         ps = pd.Series(tuple(example_dict.values()))
-        assert (s == ps).all()
+        assert_series_equal_pandas(s, ps)
 
-    def test_init_4(self):
+    def test_init_scalar(self):
         s = lt.Series(0)
         ps = pd.Series(0)
-        assert s == {0: 0}
-        assert (s == ps).all()
+        assert_series_equal_pandas(s, ps)
 
-    def test_init_5(self):
+    def test_init_mapping_with_index(self):
         s = lt.Series(example_dict, index=example_index)
         ps = pd.Series(example_dict, index=example_index)
-        assert (s == ps).all()
+        assert_series_equal_pandas(s, ps)
 
-    def test_init_error_0(self):
-        try:
-            pd.Series([0, 1, 2], [0, 1])
-        except ValueError as e:
-            # with pytest.raises(ValueError, match="Length of data and index must match"):
-            with pytest.raises(ValueError, match=re.escape(str(e))):
-                lt.Series([0, 1, 2], [0, 1])
+    def test_init_error_index_mismatch(self):
+        assert_exception(
+            lambda: pd.Series([0, 1, 2], index=[0, 1]), lambda: lt.Series([0, 1, 2], index=[0, 1]), ValueError
+        )
 
-    def test_init_error_1(self):
+    def test_init_error_unexpected_data_type(self):
         with pytest.raises(ValueError, match="Unexpected data type:"):
             lt.Series(int)
 
+    def test__str__(self):
+        s = lt.Series()
+        assert str(s) == "Empty Series"
+        s = lt.Series(name=example_name)
+        assert str(s) == f'Empty Series(name="{example_name}")'
+        s = lt.Series(example_dict)
+        assert str(s) == example_dict_series_str
+        s = lt.Series(example_dict, name=example_name)
+        assert str(s) == example_dict_series_with_name_str
+
     def test_name(self):
-        name = "snake"
-        s = lt.Series(0, name=name)
-        ps = pd.Series(0, name=name)
-        assert s.name == ps.name
+        s = lt.Series(0, name=example_name)
+        ps = pd.Series(0, name=example_name)
+        assert_series_equal_pandas(s, ps)
 
     def test_rename(self):
-        name = "snake"
-        s = lt.Series(0, name=name)
-        ps = pd.Series(0, name=name)
+        s = lt.Series(0, name=example_name)
+        ps = pd.Series(0, name=example_name)
         new_name = "cobra"
         s.rename(new_name)  # Should not mutate
+        assert_series_equal_pandas(s, ps)
         ps.rename(new_name)
-        assert s.name == ps.name
-        assert s.rename(new_name) == ps.rename(new_name)
+        assert_series_equal_pandas(s.rename(new_name), ps.rename(new_name))
+        assert_series_equal_pandas(s, ps)
 
     def test_shallow_copy(self):
         s = lt.Series([[123]])
+        ps = pd.Series([[123]])
         t = s.copy(deep=False)
+        pt = ps.copy(deep=False)
         s.iloc[0][0] = [456]
-        assert (t == s).all()
+        ps.iloc[0][0] = [456]
+        assert_series_equal_pandas(t, pt)
+        assert_series_equal_pandas(s, ps)
 
     def test_deepcopy(self):
         s = lt.Series([[123]])
-        t = s.copy()
+        p = s.copy(deep=False)
+        q = s.copy(deep=True)
         s.iloc[0][0] = [456]
-        assert (t != s).all()
+        # Pandas does not copy objects recursively
+        # https://pandas.pydata.org/docs/reference/api/pandas.Series.copy.html
+        assert (s == p).all()
+        assert (s != q).all()
 
     def test_index_getter(self):
         s = lt.Series(example_dict)
@@ -102,13 +127,25 @@ class TestInit:
         s.index = list(reversed(example_index))
         assert s.index == list(reversed(example_index))
 
+    def test_reindex(self):
+        s = lt.Series(example_dict)
+        s.reindex(list(reversed(example_index)))  # Should not mutate
+        assert s.index == list(example_index)
+        s = s.reindex(list(reversed(example_index)))
+        assert s.index == list(reversed(example_index))
+
+    def test_reindex_error(self):
+        s = lt.Series(example_dict)
+        with pytest.raises(ValueError, match="Length mismatch"):
+            s.reindex([*list(example_index), "more_indexes"])
+
     def test_index_setter_error(self):
         s = lt.Series(example_dict)
         with pytest.raises(ValueError, match="Length mismatch"):
             s.index = [*list(example_index), "more_indexes"]
 
 
-class TestAccessors:
+class TestSeriesAccessors:
     def test_getitem_0(self):
         s = lt.Series(example_dict)
         ps = pd.Series(example_dict)
@@ -284,7 +321,7 @@ class TestAccessors:
         assert s.ifind("value not found") is None
 
 
-class TestMapReduce:
+class TestSeriesMapReduce:
     def test_map(self):
         s = lt.Series(example_dict)
         ps = pd.Series(example_dict)
@@ -348,7 +385,7 @@ class TestMapReduce:
             getattr(s, func)()
 
 
-class TestStatistics:
+class TestSeriesStatistics:
     @pytest.mark.parametrize(
         "func",
         [
@@ -386,7 +423,7 @@ class TestStatistics:
     #     assert getattr(sa, func)(sb) == getattr(statistics, func)(example_dict_a.values(), example_dict_b.values())
 
 
-class TestExports:
+class TestSeriesExports:
     def test_to_list(self):
         s = lt.Series(example_dict)
         ps = pd.Series(example_dict)
@@ -398,7 +435,7 @@ class TestExports:
         assert s.to_dict() == ps.to_dict()
 
 
-class TestComparisons:
+class TestSeriesComparisons:
     def test_lt_ge(self):
         sa = lt.Series([0, 1])
         sb = lt.Series([1, 2])
@@ -440,7 +477,7 @@ class TestComparisons:
         assert ((sa != sb) == (psa != psb)).all()
 
 
-class TestOperators:
+class TestSeriesOperators:
     @pytest.mark.parametrize(
         "op",
         [
@@ -584,7 +621,7 @@ class TestOperators:
             sa + sb
 
 
-class TestUnaryOperators:
+class TestSeriesUnaryOperators:
     def test_neg(self):
         values = [-1, 0, 1]
         s = lt.Series(values)

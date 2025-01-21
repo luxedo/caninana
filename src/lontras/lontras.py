@@ -6,12 +6,16 @@ from __future__ import annotations
 import copy
 import statistics
 from collections import UserDict
-from collections.abc import Callable, Collection, Hashable, Mapping
+from collections.abc import Callable, Collection, Generator, Hashable, Iterator, Mapping, Sequence
 from functools import reduce
-from typing import Any, Literal, TypeAlias
+from typing import Any, Literal, TypeAlias, overload
 
+AxisRows = 0
+AxisCols = 1
 Scalar: TypeAlias = int | float | complex | str | bool
-Index: TypeAlias = Collection[Hashable]
+Index: TypeAlias = Sequence[Hashable]
+Axis: TypeAlias = Literal[0, 1]
+AxisOrNone: TypeAlias = Axis | None
 
 
 class LocIndexer:
@@ -135,6 +139,17 @@ class Series(UserDict):
         self.iloc = IlocIndexer(self)
         self.loc = LocIndexer(self)
 
+    def __repr__(self) -> str:
+        if len(self) == 0:
+            if self.name is None:
+                return "Empty Series"
+            return f'Empty Series(name="{self.name}")'
+        columns = list(zip(*self.items()))
+        widths = [max([len(str(v)) for v in col]) for col in columns]
+        height = len(columns[0])
+        ret = [[f"{col[i]!s:>{width}}" for col, width in zip(columns, widths)] for i in range(height)]
+        return "\n".join("  ".join(r) for r in ret) + f"\nname: {self.name}\n"
+
     def copy(self, *, deep: bool = True):
         """
         Creates a copy of the Series.
@@ -146,6 +161,7 @@ class Series(UserDict):
             Series: A copy of the Series.
         """
         clone = copy.deepcopy(self) if deep else copy.copy(self)
+        clone.name = self.name
         clone._set_indexers()  # noqa: SLF001
         return clone
 
@@ -188,6 +204,23 @@ class Series(UserDict):
             msg = f"Length mismatch: Expected axis has {len(self)} elements, new values have {len(index)} elements"
             raise ValueError(msg)
         self.data = dict(zip(index, self.values))
+
+    def reindex(self, index: Index) -> Series:
+        """
+        Sets the index of the Series.
+
+        Args:
+            value (Index): The new index for the Series.
+
+        Raises:
+            ValueError: If the length of the new index does not match the length of the Series.
+        """
+        if len(self) != len(index):
+            msg = f"Length mismatch: Expected axis has {len(self)} elements, new values have {len(index)} elements"
+            raise ValueError(msg)
+        clone = self.copy(deep=True)
+        clone.data = dict(zip(index, self.values))
+        return clone
 
     @property
     def values(self) -> list[Any]:  # type: ignore
@@ -456,7 +489,7 @@ class Series(UserDict):
     ###########################################################################
     # Statistics
     ###########################################################################
-    def mean(self):
+    def mean(self) -> Scalar:
         """
         Computes the mean of the Series.
 
@@ -465,7 +498,7 @@ class Series(UserDict):
         """
         return self.agg(statistics.mean)
 
-    def fmean(self, weights=None):
+    def fmean(self, weights=None) -> Scalar:
         """
         Convert data to floats and compute the arithmetic mean.
 
@@ -474,7 +507,7 @@ class Series(UserDict):
         """
         return self.agg(lambda values: statistics.fmean(values, weights))
 
-    def geometric_mean(self):
+    def geometric_mean(self) -> Scalar:
         """
         Convert data to floats and compute the geometric mean.
 
@@ -483,7 +516,7 @@ class Series(UserDict):
         """
         return self.agg(statistics.geometric_mean)
 
-    def harmonic_mean(self, weights=None):
+    def harmonic_mean(self, weights=None) -> Scalar:
         """
         Convert data to floats and compute the harmonic mean.
 
@@ -492,7 +525,7 @@ class Series(UserDict):
         """
         return self.agg(lambda values: statistics.harmonic_mean(values, weights))
 
-    def median(self):
+    def median(self) -> Scalar:
         """
         Return the median (middle value) of numeric data, using the common “mean of middle two” method.
         If data is empty, StatisticsError is raised. data can be a sequence or iterable.
@@ -502,7 +535,7 @@ class Series(UserDict):
         """
         return self.agg(statistics.median)
 
-    def mode(self):
+    def mode(self) -> Scalar:
         """
         Return the single most common data point from discrete or nominal data. The mode (when it exists)
         is the most typical value and serves as a measure of central location.
@@ -512,7 +545,7 @@ class Series(UserDict):
         """
         return self.agg(statistics.mode)
 
-    def multimode(self):
+    def multimode(self) -> Scalar:
         """
         Return a list of the most frequently occurring values in the order they were first encountered
         in the data. Will return more than one result if there are multiple modes or an empty list if
@@ -523,7 +556,7 @@ class Series(UserDict):
         """
         return self.agg(statistics.multimode)
 
-    def quantiles(self, *, n=4, method: Literal["exclusive", "inclusive"] = "exclusive"):
+    def quantiles(self, *, n=4, method: Literal["exclusive", "inclusive"] = "exclusive") -> Scalar:
         """
         Divide data into n continuous intervals with equal probability. Returns a list of `n - 1`
         cut points separating the intervals.
@@ -533,7 +566,7 @@ class Series(UserDict):
         """
         return self.agg(lambda values: statistics.quantiles(values, n=n, method=method))
 
-    def pstdev(self, mu=None):
+    def pstdev(self, mu=None) -> Scalar:
         """
         Return the population standard deviation (the square root of the population variance).
         See pvariance() for arguments and other details.
@@ -543,7 +576,7 @@ class Series(UserDict):
         """
         return self.agg(lambda values: statistics.pstdev(values, mu=mu))
 
-    def pvariance(self, mu=None):
+    def pvariance(self, mu=None) -> Scalar:
         """
         Return the population variance of data, a non-empty sequence or iterable of real-valued
         numbers. Variance, or second moment about the mean, is a measure of the variability
@@ -555,7 +588,7 @@ class Series(UserDict):
         """
         return self.agg(lambda values: statistics.pvariance(values, mu=mu))
 
-    def stdev(self, xbar=None):
+    def stdev(self, xbar=None) -> Scalar:
         """
         Return the sample standard deviation (the square root of the sample variance).
         See variance() for arguments and other details.
@@ -565,7 +598,7 @@ class Series(UserDict):
         """
         return self.agg(lambda values: statistics.stdev(values, xbar=xbar))
 
-    def variance(self, xbar=None):
+    def variance(self, xbar=None) -> Scalar:
         """
         Return the sample variance of data, an iterable of at least two real-valued numbers.
         Variance, or second moment about the mean, is a measure of the variability
@@ -1027,14 +1060,270 @@ class Series(UserDict):
     ###########################################################################
     # Unary Operators
     ###########################################################################
-    def __neg__(self):
+    def __neg__(self) -> Series:
         return Series({k: -v for k, v in self.items()})
 
-    def __pos__(self):
+    def __pos__(self) -> Series:
         return Series({k: +v for k, v in self.items()})
 
-    def __abs__(self):
+    def __abs__(self) -> Series:
         return Series({k: abs(v) for k, v in self.items()})
 
-    def __invert__(self):
+    def __invert__(self) -> Series:
         return Series({k: ~v for k, v in self.items()})
+
+
+class DataFrame(UserDict):
+    index: Index
+    columns: Index
+    loc_indexer: LocIndexer
+    iloc_indexer: IlocIndexer
+    _length: int
+    __slots__ = ("name", "index", "loc_indexer", "iloc_indexer", "_length")
+
+    ###########################################################################
+    # Initializer and general methods
+    ###########################################################################
+    def __init__(
+        self,
+        data: Mapping[Hashable, Series]
+        | Mapping[Hashable, Collection[Scalar]]
+        | Collection[Series]
+        | Collection[Mapping[Hashable, Scalar]]
+        | Collection[Scalar]
+        | Collection[Collection[Scalar]]
+        | Iterator
+        | None = None,
+        index: Index | None = None,
+        columns: Index | None = None,
+    ):
+        """
+        Initializes a DataFrame object.
+
+        Args:
+            data (Mapping | Collection | Scalar, optional): Data for the Series. Can be a dictionary, list, or scalar. Defaults to None.
+            index (Index, optional): Index for the Series. Defaults to None.
+            name (Hashable, optional): Name to assign to the Series. Defaults to None.
+
+        Raises:
+            ValueError: If the length of data and index don't match, or if data type is unexpected.
+        """
+        if isinstance(data, Iterator):
+            data = list(data)
+        match data:
+            case None:
+                self._init_empty(index, columns)
+            case Mapping() | Collection() if len(data) == 0:
+                self._init_empty(index, columns)
+            case Mapping() as m if all(isinstance(v, (Series, Collection)) for v in m.values()):
+                self._init_mapping_of_series({col: Series(val) for col, val in data.items()}, index, columns)  # type: ignore
+            case Collection() as c if all(isinstance(v, Series) for v in c):
+                self._init_collection_of_series(data, index, columns)  # type: ignore
+            case Collection() as c if all(isinstance(v, Mapping) for v in c):
+                self._init_collection_of_series([Series(row) for row in data], index, columns)  # type: ignore
+            case Collection() as c if all(isinstance(v, Scalar) for v in c) and not isinstance(c, str):
+                self._init_mapping_of_series({0: Series(data)}, index, columns)
+            case Collection() as c if all(isinstance(v, Collection) for v in c) and not isinstance(c, str):
+                self._init_collection_of_series([Series(row) for row in data], index, columns)  # type: ignore
+            case _:
+                msg = "DataFrame constructor not properly called!"
+                raise ValueError(msg)
+        self._validate_index_and_columns()
+
+    def _init_empty(self, index: Index | None = None, columns: Index | None = None):
+        super().__init__()
+        if (index is not None and len(index) > 0) or (columns is not None and len(columns) > 0):
+            msg = "Cannot create an empty DataFrame with preset columns and/or indexes"
+            raise ValueError(msg)
+        self.index = []
+        self.columns = []
+
+    def _init_mapping_of_series(
+        self, data: Mapping[Hashable, Series], index: Index | None = None, columns: Index | None = None
+    ):
+        col0 = next(iter(data))
+        val0 = data[col0]
+        if len(val0) == 0:
+            self._init_empty(index, columns)
+            return
+
+        self.index = val0.index if index is None else index
+        self.columns = list(data.keys()) if columns is None else columns
+        if (len(self.index) != len(val0.index)) or (len(self.columns) != len(data)):
+            passed = (len(val0.index), len(data))
+            implied = (len(self.index), len(self.columns))
+            msg = f"Shape of passed values is {passed}, indices imply {implied}"
+            raise ValueError(msg)
+        super().__init__({col: s.copy().rename(col).reindex(self.index) for col, s in zip(self.columns, data.values())})
+
+    def _init_collection_of_series(
+        self, data: Collection[Series], index: Index | None = None, columns: Index | None = None
+    ):
+        row0 = next(iter(data))
+        src_columns = row0.index
+        if len(src_columns) == 0:
+            self._init_empty(index, columns)
+            return
+
+        if columns is not None:
+            self.columns = columns
+        else:
+            self.columns = src_columns
+        if any(d.index != src_columns for d in data):
+            all_cols = {item for d in data for item in d.index}
+            missing_cols = all_cols - set(self.columns) or "{}"
+            extra_cols = set(self.columns) - all_cols or "{}"
+            msg = f"Misaligned columns. Expected {self.columns}. Missing: {missing_cols}, Extra: {extra_cols}"
+            raise ValueError(msg)
+
+        # @TODO: Deal with Series with names
+        self.index = list(range(len(data))) if index is None else index
+        if (len(self.index) != len(data)) or (len(self.columns) != len(src_columns)):
+            passed = (len(data), len(src_columns))
+            implied = (len(self.index), len(self.columns))
+            msg = f"Shape of passed values is {passed}, indices imply {implied}"
+            raise ValueError(msg)
+        super().__init__(
+            {
+                dst_col: Series({idx: row[src_col] for idx, row in zip(self.index, data)}, name=dst_col)
+                for src_col, dst_col in zip(src_columns, self.columns)
+            }
+        )
+
+    def _validate_index_and_columns(self):
+        for col, s in self.items():
+            if s.index != self.index:
+                msg = "Somehow the inner indexes and DataFrame indexex don't match. This shouldn't happen!"
+                raise ValueError(msg)
+            if s.name != col:
+                msg = "Somehow the inner columns and DataFrame columns don't match. This shouldn't happen!"
+                raise ValueError(msg)
+
+    @property
+    def shape(self) -> tuple[int, int]:
+        return (len(self.index), len(self.columns))
+
+    def __len__(self) -> int:
+        return len(self.index)
+
+    def __repr__(self):
+        if len(self) == 0:
+            return "Empty DataFrame"
+        columns = list(zip(["", *self.columns], *[[col, *s.values] for col, s in self.iterrows()]))
+        widths = [max([len(str(v)) for v in col]) for col in columns]
+        height = len(columns[0])
+        ret = [[f"{col[i]!s:>{width}}" for col, width in zip(columns, widths)] for i in range(height)]
+        return "\n".join("  ".join(r) for r in ret)
+
+    @property
+    def T(self) -> DataFrame:  # noqa: N802
+        data = list(self.values())
+        return DataFrame(data, index=self.columns[:], columns=self.index[:])
+
+    def iterrows(self) -> Generator[tuple[Hashable, Series]]:
+        yield from self.T.items()
+
+    def apply(self, method: Callable[[Series], Any], axis: Axis = 0) -> Series:
+        match axis:
+            case int(c) if c == AxisRows:
+                return Series({col: method(s) for col, s in self.items()})
+            case int(c) if c == AxisCols:
+                return self.T.apply(method, axis=0)
+            case _:
+                msg = f"No axis named {axis} for object type DataFrame"
+                raise ValueError(msg)
+
+    def _apply_with_none(self, method: Callable[[Series], Any], axis: AxisOrNone = 0):
+        match axis:
+            case None:
+                return method(self.apply(method, 0))
+            case _:
+                return self.apply(method, axis)
+
+    @overload
+    def max(self, axis: Axis) -> Series: ...  # no cov
+    @overload
+    def max(self, axis: None = ...) -> Scalar: ...  # no cov
+    def max(self, axis: AxisOrNone = 0) -> Series | Scalar:
+        return self._apply_with_none(lambda s: s.max(), axis)
+
+    @overload
+    def min(self, axis: Axis) -> Series: ...  # no cov
+    @overload
+    def min(self, axis: None = ...) -> Scalar: ...  # no cov
+    def min(self, axis: AxisOrNone = 0) -> Series | Scalar:
+        return self._apply_with_none(lambda s: s.min(), axis)
+
+    @overload
+    def sum(self, axis: Axis) -> Series: ...  # no cov
+    @overload
+    def sum(self, axis: None = ...) -> Scalar: ...  # no cov
+    def sum(self, axis: AxisOrNone = 0) -> Series | Scalar:
+        return self._apply_with_none(lambda s: s.sum(), axis)
+
+    @overload
+    def all(self, axis: Axis) -> Series: ...  # no cov
+    @overload
+    def all(self, axis: None = ...) -> bool: ...  # no cov
+    def all(self, axis: AxisOrNone = 0) -> Series | bool:
+        return self._apply_with_none(lambda s: s.all(), axis)
+
+    @overload
+    def any(self, axis: Axis) -> Series: ...  # no cov
+    @overload
+    def any(self, axis: None = ...) -> bool: ...  # no cov
+    def any(self, axis: AxisOrNone = 0) -> Series | bool:
+        return self._apply_with_none(lambda s: s.any(), axis)
+
+    @overload
+    def idxmax(self, axis: Axis) -> Series: ...  # no cov
+    @overload
+    def idxmax(self, axis: None = ...) -> bool: ...  # no cov
+    def idxmax(self, axis: AxisOrNone = 0) -> Series | bool:
+        return self._apply_with_none(lambda s: s.idxmax(), axis)
+
+    @overload
+    def idxmin(self, axis: Axis) -> Series: ...  # no cov
+    @overload
+    def idxmin(self, axis: None = ...) -> bool: ...  # no cov
+    def idxmin(self, axis: AxisOrNone = 0) -> Series | bool:
+        return self._apply_with_none(lambda s: s.idxmin(), axis)
+
+    def op(
+        self, op: str, other: DataFrame | Series | Mapping | Collection | Scalar
+    ) -> DataFrame:  # @TODO: Implement axis
+        match other:
+            case DataFrame():
+                return self._op_dataframe(op, other)
+            case Series():
+                return self._op_series(op, other)
+            case Collection() | Mapping() as c if len(c) == 0 and len(self) == 0:
+                return DataFrame()
+            case Collection() | Mapping() as c if len(c) != len(self.columns):
+                msg = f"Unable to coerce to Series, length must be {len(self.columns)}: given {len(other)}"
+                raise ValueError(msg)
+            case Mapping():
+                return self._op_series(op, Series(other))
+            case Collection() as c if not isinstance(c, str):
+                return self._op_series(op, Series(other, index=self.columns))
+            # No 2d collection comparison. Will consider 2d inputs as a series of collections
+            case _:  # Everithing else is a scalar then
+                return self._op_scalar(op, other)
+
+    def _op_series(self, op: str, other: Series) -> DataFrame:
+        if len(self.columns) != len(other):
+            msg = "Operands are not aligned. Do `left, right = left.align(right, axis=1, copy=False)` before operating."
+            raise ValueError(msg)
+        return DataFrame([getattr(row, op)(other) for _, row in self.iterrows()], index=self.index)
+
+    def _op_dataframe(self, op: str, other: DataFrame) -> DataFrame:
+        if set(self.keys()) != set(other.keys()):
+            msg = "Can only compare identically-labeled (both index and columns) DataFrame objects"
+            raise ValueError(msg)
+        return DataFrame([getattr(s, op)(other[col]) for col, s in self.items()])
+
+    def _op_scalar(self, op: str, other: Collection[Any] | Scalar) -> DataFrame:
+        return DataFrame({col: getattr(s, op)(other) for col, s in self.items()})
+
+    def __eq__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:  # type: ignore
+        return self.op("__eq__", other)
