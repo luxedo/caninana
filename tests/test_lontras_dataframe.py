@@ -543,7 +543,9 @@ class TestDataFrameStatistics:
         assert getattr(df, func)(axis=1) == getattr(pdf, func)(axis=1)
         if func in ["std", "var"]:
             # The behavior of std and var with axis=None is deprecated
-            assert getattr(df, func)(axis=None) == getattr(getattr(pdf, func)(), func)()
+            assert getattr(df, func)(axis=None) == getattr(pdf.values.ravel(), func)(
+                ddof=1
+            )  # Numpy defaults to population std
         else:
             assert getattr(df, func)(axis=None) == getattr(pdf, func)(axis=None)
 

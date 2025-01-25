@@ -402,7 +402,7 @@ class Series(UserDict):
         """
         return self.map(abs)
 
-    def max(self):
+    def max(self) -> Scalar:
         """
         Returns the maximum value in the Series.
 
@@ -411,7 +411,7 @@ class Series(UserDict):
         """
         return self.agg(max)
 
-    def min(self):
+    def min(self) -> Scalar:
         """
         Returns the minimum value in the Series.
 
@@ -420,7 +420,7 @@ class Series(UserDict):
         """
         return self.agg(min)
 
-    def sum(self):
+    def sum(self) -> Scalar:
         """
         Returns the sum of the values in the Series.
 
@@ -429,7 +429,7 @@ class Series(UserDict):
         """
         return self.agg(sum)
 
-    def all(self):
+    def all(self) -> bool:
         """
         Returns True if all values in the Series are True.
 
@@ -438,7 +438,7 @@ class Series(UserDict):
         """
         return self.agg(all)
 
-    def any(self):
+    def any(self) -> bool:
         """
         Returns True if any value in the Series is True.
 
@@ -447,7 +447,7 @@ class Series(UserDict):
         """
         return self.agg(any)
 
-    def argmax(self):
+    def argmax(self) -> int:
         """
         Returns the index of the maximum value.
 
@@ -457,9 +457,9 @@ class Series(UserDict):
         if len(self) == 0:
             msg = "Attempt to get argmax of an empty sequence"
             raise ValueError(msg)
-        return self.ifind(self.max())
+        return self.ifind(self.max())  # type: ignore
 
-    def argmin(self):
+    def argmin(self) -> int:
         """
         Returns the index of the minimum value.
 
@@ -469,9 +469,9 @@ class Series(UserDict):
         if len(self) == 0:
             msg = "Attempt to get argmin of an empty sequence"
             raise ValueError(msg)
-        return self.ifind(self.min())
+        return self.ifind(self.min())  # type: ignore
 
-    def idxmax(self):
+    def idxmax(self) -> Hashable | None:
         """
         Returns the label of the maximum value.
 
@@ -483,7 +483,7 @@ class Series(UserDict):
             raise ValueError(msg)
         return self.find(self.max())
 
-    def idxmin(self):
+    def idxmin(self) -> Hashable | None:
         """
         Returns the label of the minimum value.
 
@@ -1200,63 +1200,67 @@ class DataFrame(UserDict):
     def _agg_with_none(self, method: Callable[[Collection[Any]], Any], axis: AxisOrNone = 0):
         match axis:
             case None:
-                return method(self.agg(method, 0).values)
+                return method([item for sublist in self.to_list() for item in sublist])
             case _:
                 return self.agg(method, axis)
 
     @overload
     def max(self, axis: Axis) -> Series: ...  # no cov
     @overload
-    def max(self, axis: None = ...) -> Scalar: ...  # no cov
+    def max(self, axis: None) -> Scalar: ...  # no cov
     def max(self, axis: AxisOrNone = 0) -> Series | Scalar:
         return self._apply_with_none(lambda s: s.max(), axis)
 
     @overload
     def min(self, axis: Axis) -> Series: ...  # no cov
     @overload
-    def min(self, axis: None = ...) -> Scalar: ...  # no cov
+    def min(self, axis: None) -> Scalar: ...  # no cov
     def min(self, axis: AxisOrNone = 0) -> Series | Scalar:
         return self._apply_with_none(lambda s: s.min(), axis)
 
     @overload
     def sum(self, axis: Axis) -> Series: ...  # no cov
     @overload
-    def sum(self, axis: None = ...) -> Scalar: ...  # no cov
+    def sum(self, axis: None) -> Scalar: ...  # no cov
     def sum(self, axis: AxisOrNone = 0) -> Series | Scalar:
         return self._apply_with_none(lambda s: s.sum(), axis)
 
     @overload
     def all(self, axis: Axis) -> Series: ...  # no cov
     @overload
-    def all(self, axis: None = ...) -> bool: ...  # no cov
+    def all(self, axis: None) -> bool: ...  # no cov
     def all(self, axis: AxisOrNone = 0) -> Series | bool:
         return self._apply_with_none(lambda s: s.all(), axis)
 
     @overload
     def any(self, axis: Axis) -> Series: ...  # no cov
     @overload
-    def any(self, axis: None = ...) -> bool: ...  # no cov
+    def any(self, axis: None) -> bool: ...  # no cov
     def any(self, axis: AxisOrNone = 0) -> Series | bool:
         return self._apply_with_none(lambda s: s.any(), axis)
 
     @overload
     def idxmax(self, axis: Axis) -> Series: ...  # no cov
     @overload
-    def idxmax(self, axis: None = ...) -> bool: ...  # no cov
+    def idxmax(self, axis: None) -> bool: ...  # no cov
     def idxmax(self, axis: AxisOrNone = 0) -> Series | bool:
         return self._apply_with_none(lambda s: s.idxmax(), axis)
 
     @overload
     def idxmin(self, axis: Axis) -> Series: ...  # no cov
     @overload
-    def idxmin(self, axis: None = ...) -> bool: ...  # no cov
+    def idxmin(self, axis: None) -> bool: ...  # no cov
     def idxmin(self, axis: AxisOrNone = 0) -> Series | bool:
         return self._apply_with_none(lambda s: s.idxmin(), axis)
 
     ###########################################################################
     # Statistics
     ###########################################################################
-    def mean(self, axis: AxisOrNone = 0) -> Scalar:
+    @overload
+    def mean(self, axis: Axis) -> Series: ...  # no cov
+    @overload
+    def mean(self, axis: None) -> Scalar: ...  # no cov
+    def mean(self, axis: AxisOrNone = 0) -> Series | Scalar:
         """
         Computes the mean of the Series.
 
@@ -1265,7 +1269,11 @@ class DataFrame(UserDict):
         """
         return self._agg_with_none(statistics.mean, axis=axis)
 
-    def median(self, axis: AxisOrNone = 0) -> Scalar:
+    @overload
+    def median(self, axis: Axis) -> Series: ...  # no cov
+    @overload
+    def median(self, axis: None) -> Scalar: ...  # no cov
+    def median(self, axis: AxisOrNone = 0) -> Series | Scalar:
         """
         Return the median (middle value) of numeric data, using the common “mean of middle two” method.
         If data is empty, StatisticsError is raised. data can be a sequence or iterable.
@@ -1296,7 +1304,11 @@ class DataFrame(UserDict):
         """
         return self.agg(lambda values: statistics.quantiles(values, n=n, method=method), axis=axis)
 
-    def std(self, xbar=None, axis: AxisOrNone = 0) -> Scalar:
+    @overload
+    def std(self, xbar, axis: Axis) -> Series: ...  # no cov
+    @overload
+    def std(self, xbar, axis: None) -> Scalar: ...  # no cov
+    def std(self, xbar=None, axis: AxisOrNone = 0) -> Series | Scalar:
         """
         Return the sample standard deviation (the square root of the sample variance).
         See variance() for arguments and other details.
@@ -1306,7 +1318,11 @@ class DataFrame(UserDict):
         """
         return self._agg_with_none(lambda values: statistics.stdev(values, xbar=xbar), axis=axis)
 
-    def var(self, xbar=None, axis: AxisOrNone = 0) -> Scalar:
+    @overload
+    def var(self, xbar, axis: Axis) -> Series: ...  # no cov
+    @overload
+    def var(self, xbar, axis: None) -> Scalar: ...  # no cov
+    def var(self, xbar=None, axis: AxisOrNone = 0) -> Series | Scalar:
         """
         Return the sample variance of data, an iterable of at least two real-valued numbers.
         Variance, or second moment about the mean, is a measure of the variability
@@ -1363,23 +1379,6 @@ class DataFrame(UserDict):
     ###########################################################################
     # Comparisons
     ###########################################################################
-
-    ###########################################################################
-    # Operators
-    ###########################################################################
-
-    ###########################################################################
-    # Right-hand Side Operators
-    ###########################################################################
-
-    ###########################################################################
-    # In-place Operators
-    ###########################################################################
-
-    ###########################################################################
-    # Unary Operators
-    ###########################################################################
-
     def op(
         self, op: str, other: DataFrame | Series | Mapping | Collection | Scalar
     ) -> DataFrame:  # @TODO: Implement axis
@@ -1418,3 +1417,19 @@ class DataFrame(UserDict):
 
     def __eq__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:  # type: ignore
         return self.op("__eq__", other)
+
+    ###########################################################################
+    # Operators
+    ###########################################################################
+
+    ###########################################################################
+    # Right-hand Side Operators
+    ###########################################################################
+
+    ###########################################################################
+    # In-place Operators
+    ###########################################################################
+
+    ###########################################################################
+    # Unary Operators
+    ###########################################################################
