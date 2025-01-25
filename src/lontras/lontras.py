@@ -402,6 +402,25 @@ class Series(UserDict):
         """
         return self.map(abs)
 
+    def dot(self, other: Series | Collection | Scalar) -> Scalar:
+        """
+        Performs dot product with another Series, Collection or Scalar.
+
+        If other is a Series or a Collection, performs the dot product between the two.
+        If other is a Scalar, multiplies all elements of the Series by the scalar and returns the sum.
+
+        Args:
+            other (Series | Collection | Scalar)
+
+        Returns:
+            Scalar: The dot product of the Series.
+        """
+        other = self._other_as_series_matching(other)
+        acc = 0
+        for key, value in self.items():
+            acc += other[key] * value
+        return acc
+
     def max(self) -> Scalar:
         """
         Returns the maximum value in the Series.
@@ -728,11 +747,7 @@ class Series(UserDict):
         Returns:
             Scalar: The dot product of the Series.
         """
-        other = self._other_as_series_matching(other)
-        acc = 0
-        for key, value in self.items():
-            acc += other[key] * value
-        return acc
+        return self.dot(other)
 
     def __truediv__(self, other: Series | Collection | Scalar) -> Series:
         """
@@ -937,10 +952,10 @@ class Series(UserDict):
         for k in self:
             self[k] *= other[k]
 
-    # def __imatmul__(self, other: Series | Collection | Scalar):
-    #     other = self._other_as_series_matching(other)
-    #     for k in self:
-    #         self[k] @= other[k]
+    def __imatmul__(self, other: Series | Collection | Scalar):
+        other = self._other_as_series_matching(other)
+        for k in self:
+            self[k] @= other[k]
 
     def __itruediv__(self, other: Series | Collection | Scalar):
         other = self._other_as_series_matching(other)
@@ -1228,6 +1243,12 @@ class DataFrame(UserDict):
         """
         return self.map(new_type)
 
+    # def dot(self, other: Series | Collection | Scalar) -> DataFrame | Series:
+    #     """
+    #     @REDO
+    #     """
+    #     return 10
+
     def abs(self) -> DataFrame:
         """
         Returns the absolute values for DataFrame
@@ -1238,12 +1259,16 @@ class DataFrame(UserDict):
         return self.map(abs)
 
     @overload
+    def max(self) -> Series: ...  # no cov
+    @overload
     def max(self, axis: Axis) -> Series: ...  # no cov
     @overload
     def max(self, axis: None) -> Scalar: ...  # no cov
     def max(self, axis: AxisOrNone = 0) -> Series | Scalar:
         return self._apply_with_none(lambda s: s.max(), axis)
 
+    @overload
+    def min(self) -> Series: ...  # no cov
     @overload
     def min(self, axis: Axis) -> Series: ...  # no cov
     @overload
@@ -1252,12 +1277,16 @@ class DataFrame(UserDict):
         return self._apply_with_none(lambda s: s.min(), axis)
 
     @overload
+    def sum(self) -> Series: ...  # no cov
+    @overload
     def sum(self, axis: Axis) -> Series: ...  # no cov
     @overload
     def sum(self, axis: None) -> Scalar: ...  # no cov
     def sum(self, axis: AxisOrNone = 0) -> Series | Scalar:
         return self._apply_with_none(lambda s: s.sum(), axis)
 
+    @overload
+    def all(self) -> Series: ...  # no cov
     @overload
     def all(self, axis: Axis) -> Series: ...  # no cov
     @overload
@@ -1266,6 +1295,8 @@ class DataFrame(UserDict):
         return self._apply_with_none(lambda s: s.all(), axis)
 
     @overload
+    def any(self) -> Series: ...  # no cov
+    @overload
     def any(self, axis: Axis) -> Series: ...  # no cov
     @overload
     def any(self, axis: None) -> bool: ...  # no cov
@@ -1273,12 +1304,16 @@ class DataFrame(UserDict):
         return self._apply_with_none(lambda s: s.any(), axis)
 
     @overload
+    def idxmax(self) -> Series: ...  # no cov
+    @overload
     def idxmax(self, axis: Axis) -> Series: ...  # no cov
     @overload
     def idxmax(self, axis: None) -> bool: ...  # no cov
     def idxmax(self, axis: AxisOrNone = 0) -> Series | bool:
         return self._apply_with_none(lambda s: s.idxmax(), axis)
 
+    @overload
+    def idxmin(self) -> Series: ...  # no cov
     @overload
     def idxmin(self, axis: Axis) -> Series: ...  # no cov
     @overload
@@ -1541,10 +1576,209 @@ class DataFrame(UserDict):
     ###########################################################################
     # Operators
     ###########################################################################
+    def __add__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:
+        """
+        Element-wise addition.
+
+        Args:
+            other (DataFrame | Series | Collection | Scalar): The other DataFrame, Series, Collection, or Scalar to operate with.
+
+        Returns:
+            DataFrame: A DataFrame with the results of the operation.
+        """
+        return self.op("__add__", other)
+
+    def __sub__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:
+        """
+        Element-wise subtraction.
+
+        Args:
+            other (DataFrame | Series | Collection | Scalar): The other DataFrame, Series, Collection, or Scalar to operate with.
+
+        Returns:
+            DataFrame: A DataFrame with the results of the operation.
+        """
+        return self.op("__sub__", other)
+
+    def __mul__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:
+        """
+        Element-wise multiplication.
+
+        Args:
+            other (DataFrame | Series | Collection | Scalar): The other DataFrame, Series, Collection, or Scalar to operate with.
+
+        Returns:
+            DataFrame: A DataFrame with the results of the operation.
+        """
+        return self.op("__mul__", other)
+
+    # def __matmul__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame | Series:
+    #     """
+    #     @REDO!
+    #     """
+    #     return self.dot(other)
+
+    def __truediv__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:
+        """
+        Element-wise division.
+
+        Args:
+            other (DataFrame | Series | Collection | Scalar): The other DataFrame, Series, Collection, or Scalar to operate with.
+
+        Returns:
+            DataFrame: A DataFrame with the results of the operation.
+        """
+        return self.op("__truediv__", other)
+
+    def __floordiv__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:
+        """
+        Element-wise floor division.
+
+        Args:
+            other (DataFrame | Series | Collection | Scalar): The other DataFrame, Series, Collection, or Scalar to operate with.
+
+        Returns:
+            DataFrame: A DataFrame with the results of the operation.
+        """
+        return self.op("__floordiv__", other)
+
+    def __mod__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:
+        """
+        Element-wise modulo.
+
+        Args:
+            other (DataFrame | Series | Collection | Scalar): The other DataFrame, Series, Collection, or Scalar to operate with.
+
+        Returns:
+            DataFrame: A DataFrame with the results of the operation.
+        """
+        return self.op("__mod__", other)
+
+    def __divmod__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:
+        """
+        Element-wise divmod.
+
+        Args:
+            other (DataFrame | Series | Collection | Scalar): The other DataFrame, Series, Collection, or Scalar to operate with.
+
+        Returns:
+            DataFrame: A DataFrame with the results of the operation.
+        """
+        return self.op("__divmod__", other)
+
+    def __pow__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:
+        """
+        Element-wise exponentiation.
+
+        Args:
+            other (DataFrame | Series | Collection | Scalar): The other DataFrame, Series, Collection, or Scalar to operate with.
+
+        Returns:
+            DataFrame: A DataFrame with the results of the operation.
+        """
+        return self.op("__pow__", other)
+
+    def __lshift__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:
+        """
+        Element-wise left bit shift.
+
+        Args:
+            other (DataFrame | Series | Collection | Scalar): The other DataFrame, Series, Collection, or Scalar to operate with.
+
+        Returns:
+            DataFrame: A DataFrame with the results of the operation.
+        """
+        return self.op("__lshift__", other)
+
+    def __rshift__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:
+        """
+        Element-wise right bit shift.
+
+        Args:
+            other (DataFrame | Series | Collection | Scalar): The other DataFrame, Series, Collection, or Scalar to operate with.
+
+        Returns:
+            DataFrame: A DataFrame with the results of the operation.
+        """
+        return self.op("__rshift__", other)
+
+    def __and__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:
+        """
+        Element-wise AND.
+
+        Args:
+            other (DataFrame | Series | Collection | Scalar): The other DataFrame, Series, Collection, or Scalar to operate with.
+
+        Returns:
+            DataFrame: A DataFrame with the results of the operation.
+        """
+        return self.op("__and__", other)
+
+    def __xor__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:
+        """
+        Element-wise XOR.
+
+        Args:
+            other (DataFrame | Series | Collection | Scalar): The other DataFrame, Series, Collection, or Scalar to operate with.
+
+        Returns:
+            DataFrame: A DataFrame with the results of the operation.
+        """
+        return self.op("__xor__", other)
+
+    def __or__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:
+        """
+        Element-wise OR.
+
+        Args:
+            other (DataFrame | Series | Collection | Scalar): The other DataFrame, Series, Collection, or Scalar to operate with.
+
+        Returns:
+            DataFrame: A DataFrame with the results of the operation.
+        """
+        return self.op("__or__", other)
 
     ###########################################################################
     # Right-hand Side Operators
     ###########################################################################
+    def __radd__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:
+        return self.op("__radd__", other)
+
+    def __rsub__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:
+        return self.op("__rsub__", other)
+
+    def __rmul__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:
+        return self.op("__rmul__", other)
+
+    def __rtruediv__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:
+        return self.op("__rtruediv__", other)
+
+    def __rfloordiv__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:
+        return self.op("__rfloordiv__", other)
+
+    def __rmod__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:
+        return self.op("__rmod__", other)
+
+    def __rdivmod__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:
+        return self.op("__rdivmod__", other)
+
+    def __rpow__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:
+        return self.op("__rpow__", other)
+
+    def __rlshift__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:
+        return self.op("__rlshift__", other)
+
+    def __rrshift__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:
+        return self.op("__rrshift__", other)
+
+    def __rand__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:
+        return self.op("__rand__", other)
+
+    def __rxor__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:
+        return self.op("__rxor__", other)
+
+    def __ror__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:
+        return self.op("__ror__", other)
 
     ###########################################################################
     # In-place Operators

@@ -527,17 +527,15 @@ class TestSeriesOperators:
         ],
     )
     def test_bop(self, op):
-        # Series
         sa = lt.Series(example_dict_a)
         sb = lt.Series(example_dict_b)
         psa = pd.Series(example_dict_a)
         psb = pd.Series(example_dict_b)
+        # Series
         assert_series_equal_pandas(getattr(sa, op)(sb), getattr(psa, op)(psb))
-
         # Scalar
         sa = lt.Series(example_dict_a)
         assert_series_equal_pandas(getattr(sa, op)(example_scalar), getattr(psa, op)(example_scalar))
-
         # Collection
         sa = lt.Series(example_dict_a)
         assert_series_equal_pandas(getattr(sa, op)(example_values), getattr(psa, op)(np.array(example_values)))
@@ -558,17 +556,21 @@ class TestSeriesOperators:
         # Series
         sa = lt.Series(example_dict_a)
         sb = lt.Series(example_dict_b)
-        assert getattr(sa, op)(sb) == {k: getattr(v, op)(example_dict_b[k]) for k, v in example_dict_a.items()}
+        assert getattr(sa, op)(sb) == lt.Series(
+            {k: getattr(v, op)(example_dict_b[k]) for k, v in example_dict_a.items()}
+        )
 
         # Scalar
         sa = lt.Series(example_dict_a)
-        assert getattr(sa, op)(example_scalar) == {k: getattr(v, op)(example_scalar) for k, v in example_dict_a.items()}
+        assert getattr(sa, op)(example_scalar) == lt.Series(
+            {k: getattr(v, op)(example_scalar) for k, v in example_dict_a.items()}
+        )
 
         # Collection
         sa = lt.Series(example_dict_a)
-        assert getattr(sa, op)(example_values) == {
-            k: getattr(v, op)(example_values[i]) for i, (k, v) in enumerate(example_dict_a.items())
-        }
+        assert getattr(sa, op)(example_values) == lt.Series(
+            {k: getattr(v, op)(example_values[i]) for i, (k, v) in enumerate(example_dict_a.items())}
+        )
 
     @pytest.mark.parametrize(
         "iop",

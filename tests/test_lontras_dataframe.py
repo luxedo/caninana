@@ -35,7 +35,10 @@ example_dict_series_pd = {
 example_scalar = 3
 example_cmp_a = [0, 1, 3]
 example_cmp_b = [1, 2, 3]
-example_unary = [-3, -1, 0, 1, 2]
+example_op_collection = [1, 2, 3, 4, 5]
+example_op_a = [[-3, -1, 13, 1, 2], [10, 2, -1, -13, -4]]
+example_op_b = [[7, 2, -9, 1, 3], [-1, 20, -3, 12, 4]]
+example_unary = [[-3, -1, 0, 1, 2], [10, 2, -1, 0, -4]]
 
 
 class TestDataFrameInit:
@@ -224,6 +227,9 @@ class TestDataFrameInit:
         assert str(df) == str(pdf)
         df = lt.DataFrame(example_collection_scalars)
         pdf = pd.DataFrame(example_collection_scalars)
+        assert str(df) == str(pdf)
+        df = lt.DataFrame([[(0, 1), (2, 3)], [(4, 5), (6, 7)]])
+        pdf = pd.DataFrame([[(0, 1), (2, 3)], [(4, 5), (6, 7)]])
         assert str(df) == str(pdf)
 
 
@@ -436,17 +442,11 @@ class TestDataFrameInit:
 #         assert df.ifind("value not found") is None
 
 
-class TestDataFrameMapReduce:
-    #     def test_map(self):
-    #         df = lt.DataFrame(example_list_dict)
-    #         pdf = pd.DataFrame(example_list_dict)
-    #         assert (df.map(lambda x: x**2) == pdf.map(lambda x: x**2)).all()
-
-    #     def test_reduce(self):
-    #         df = lt.DataFrame(example_list_dict)
-    #         assert df.reduce(lambda acc, cur: acc + cur[0], "") == "".join(example_index)
-    #         df = lt.DataFrame()
-    #         assert df.reduce(lambda *_: 0, 0) == 0
+class TestDataFrameMapAggregate:
+    def test_map(self):
+        df = lt.DataFrame(example_list_dict)
+        pdf = pd.DataFrame(example_list_dict)
+        assert_dataframe_equal_pandas(df.map(lambda x: x**2), pdf.map(lambda x: x**2))
 
     @pytest.mark.parametrize(
         "func",
@@ -496,13 +496,13 @@ class TestDataFrameMapReduce:
         with pytest.raises(ValueError, match=match):
             lt.DataFrame(example_list_dict).apply(lambda x: x, axis=-1)
 
-    # def test_any(self):
-    #     df = lt.DataFrame([0, 1, 2])
-    #     pdf = pd.DataFrame([0, 1, 2])
-    #     assert df.any() == pdf.any()
-    #     df = lt.DataFrame([0])
-    #     pdf = pd.DataFrame([0])
-    #     assert df.any() == pdf.any()
+    def test_any(self):
+        df = lt.DataFrame([0, 1, 2])
+        pdf = pd.DataFrame([0, 1, 2])
+        assert_series_equal_pandas(df.any(), pdf.any())
+        df = lt.DataFrame([0])
+        pdf = pd.DataFrame([0])
+        assert_series_equal_pandas(df.any(), pdf.any())
 
     def test_astype(self):
         df = lt.DataFrame(example_list_dict)
@@ -515,28 +515,12 @@ class TestDataFrameMapReduce:
         assert_dataframe_equal_pandas(df.abs(), pdf.abs())
 
 
-#     @pytest.mark.parametrize(
-#         "func",
-#         [
-#             "argmax",
-#             "argmin",
-#             "idxmax",
-#             "idxmin",
-#         ],
-#     )
-#     def test_arg_idx_errors(self, func):
-#         df = lt.DataFrame()
-#         with pytest.raises(ValueError, match="empty sequence"):
-#             getattr(s, func)()
-
-
 class TestDataFrameStatistics:
     @pytest.mark.parametrize(
         "func",
         [
             "mean",
             "median",
-            # "mode",
             "std",
             "var",
         ],
@@ -702,104 +686,158 @@ class TestDataFrameComparisons:
         assert_dataframe_equal_pandas(dfa != dfb, pdfa != pdfb)
 
 
-# class TestDataFrameOperators:
-#     @pytest.mark.parametrize(
-#         "op",
-#         [
-#             "__add__",
-#             "__sub__",
-#             "__mul__",
-#             "__truediv__",
-#             "__floordiv__",
-#             "__mod__",
-#             "__pow__",
-#             "__radd__",
-#             "__rsub__",
-#             "__rmul__",
-#             "__rtruediv__",
-#             "__rfloordiv__",
-#             "__rmod__",
-#             "__rpow__",
-#         ],
-#     )
-#     def test_op(self, op):
-#         sa = lt.DataFrame(example_list_dict_a)
-#         sb = lt.DataFrame(example_list_dict_b)
-#         psa = pd.DataFrame(example_list_dict_a)
-#         psb = pd.DataFrame(example_list_dict_b)
+class TestDataFrameOperators:
+    @pytest.mark.parametrize(
+        "op",
+        [
+            "__add__",
+            "__sub__",
+            "__mul__",
+            "__truediv__",
+            "__floordiv__",
+            "__mod__",
+            "__radd__",
+            "__rsub__",
+            "__rmul__",
+            "__rtruediv__",
+            "__rfloordiv__",
+            "__rmod__",
+            "__and__",
+            "__xor__",
+            "__or__",
+            "__rand__",
+            "__rxor__",
+            "__ror__",
+        ],
+    )
+    def test_op(self, op):
+        dfa = lt.DataFrame(example_op_a)
+        dfb = lt.DataFrame(example_op_b)
+        pdfa = pd.DataFrame(example_op_a)
+        pdfb = pd.DataFrame(example_op_b)
 
-#         # DataFrame
-#         assert (getattr(sa, op)(sb) == getattr(psa, op)(psb)).all()
-#         # Scalar
-#         assert (getattr(sa, op)(example_scalar) == getattr(psa, op)(example_scalar)).all()
-#         # Collection
-#         assert (getattr(sa, op)(example_values) == getattr(psa, op)(example_values)).all()
+        # DataFrame
+        assert_dataframe_equal_pandas(getattr(dfa, op)(dfb), getattr(pdfa, op)(pdfb))
+        # Series
+        assert_dataframe_equal_pandas(
+            getattr(dfa, op)(lt.Series(example_op_collection)), getattr(pdfa, op)(pd.Series(example_op_collection))
+        )
+        # Scalar
+        assert_dataframe_equal_pandas(getattr(dfa, op)(example_scalar), getattr(pdfa, op)(example_scalar))
+        # Collection
+        assert_dataframe_equal_pandas(getattr(dfa, op)(example_op_collection), getattr(pdfa, op)(example_op_collection))
 
-#     def test_matmul(self):
-#         sa = lt.DataFrame(example_list_dict_a)
-#         sb = lt.DataFrame(example_list_dict_b)
-#         psa = pd.DataFrame(example_list_dict_a)
-#         psb = pd.DataFrame(example_list_dict_b)
+    @pytest.mark.parametrize(
+        "op",
+        [
+            "__divmod__",
+            "__rdivmod__",
+        ],
+    )
+    def test_op_no_pandas(self, op):
+        dfa = lt.DataFrame(example_op_a)
+        # DataFrame
+        dfb = lt.DataFrame(example_op_b)
+        assert (
+            getattr(dfa, op)(dfb)
+            == lt.DataFrame(
+                [[getattr(a, op)(example_op_b[i][j]) for j, a in enumerate(row)] for i, row in enumerate(example_op_a)]
+            )
+        ).all(axis=None)
+        # Series
+        s = lt.Series(example_op_collection)
+        assert (
+            getattr(dfa, op)(s)
+            == lt.DataFrame([[getattr(a, op)(s[j]) for j, a in enumerate(row)] for row in example_op_a])
+        ).all(axis=None)
+        # Scalar
+        assert (
+            getattr(dfa, op)(example_scalar)
+            == lt.DataFrame([[getattr(a, op)(example_scalar) for a in row] for row in example_op_a])
+        ).all(axis=None)
+        # Collection
+        assert (
+            getattr(dfa, op)(example_op_collection)
+            == lt.DataFrame(
+                [[getattr(a, op)(example_op_collection[j]) for j, a in enumerate(row)] for row in example_op_a]
+            )
+        ).all(axis=None)
 
-#         # DataFrame
-#         assert (sa @ sb) == (psa @ psb)
-#         # Collection
-#         assert (sa @ example_values) == (psa @ example_values)
+    # def test_matmul(self):
+    #     sa = lt.DataFrame(example_op_a)
+    #     sb = lt.DataFrame(example_op_b)
+    #     print(sa @ sb)
+    #     psa = pd.DataFrame(example_op_a)
+    #     psb = pd.DataFrame(example_op_b)
+    #     print(psa @ psb)
 
-#     @pytest.mark.parametrize(
-#         "op",
-#         [
-#             "__and__",
-#             "__xor__",
-#             "__or__",
-#             "__rand__",
-#             "__rxor__",
-#             "__ror__",
-#         ],
-#     )
-#     def test_bop(self, op):
-#         # DataFrame
-#         sa = lt.DataFrame(example_list_dict_a)
-#         sb = lt.DataFrame(example_list_dict_b)
-#         psa = pd.DataFrame(example_list_dict_a)
-#         psb = pd.DataFrame(example_list_dict_b)
-#         assert (getattr(sa, op)(sb) == getattr(psa, op)(psb)).all()
+    @pytest.mark.parametrize(
+        "op",
+        [
+            "__pow__",
+            "__rpow__",
+        ],
+    )
+    def test_op_positive(self, op):
+        dfa = lt.DataFrame(example_op_a).abs()
+        dfb = lt.DataFrame(example_op_b).abs()
+        pdfa = pd.DataFrame(example_op_a).abs()
+        pdfb = pd.DataFrame(example_op_b).abs()
+        # DataFrame
+        assert_dataframe_equal_pandas(getattr(dfa, op)(dfb), getattr(pdfa, op)(pdfb))
+        # Series
+        assert_dataframe_equal_pandas(
+            getattr(dfa, op)(lt.Series(example_op_collection)), getattr(pdfa, op)(pd.Series(example_op_collection))
+        )
+        # Scalar
+        assert_dataframe_equal_pandas(getattr(dfa, op)(example_scalar), getattr(pdfa, op)(example_scalar))
+        # Collection
+        assert_dataframe_equal_pandas(getattr(dfa, op)(example_op_collection), getattr(pdfa, op)(example_op_collection))
 
-#         # Scalar
-#         sa = lt.DataFrame(example_list_dict_a)
-#         assert (getattr(sa, op)(example_scalar) == getattr(psa, op)(example_scalar)).all()
+    @pytest.mark.parametrize(
+        "op",
+        [
+            "__lshift__",
+            "__rshift__",
+            "__rlshift__",
+            "__rrshift__",
+        ],
+    )
+    def test_op_positive_no_pandas(self, op):
+        dfa = lt.DataFrame(example_op_a).abs()
+        # DataFrame
+        dfb = lt.DataFrame(example_op_b).abs()
+        assert (
+            getattr(dfa, op)(dfb)
+            == lt.DataFrame(
+                [
+                    [getattr(abs(a), op)(abs(example_op_b[i][j])) for j, a in enumerate(row)]
+                    for i, row in enumerate(example_op_a)
+                ]
+            )
+        ).all(axis=None)
+        # Series
+        s = lt.Series(example_op_collection)
+        assert (
+            getattr(dfa, op)(s)
+            == lt.DataFrame([[getattr(abs(a), op)(abs(s[j])) for j, a in enumerate(row)] for row in example_op_a])
+        ).all(axis=None)
+        # Scalar
+        assert (
+            getattr(dfa, op)(example_scalar)
+            == lt.DataFrame([[getattr(abs(a), op)(example_scalar) for a in row] for row in example_op_a])
+        ).all(axis=None)
+        # Collection
+        assert (
+            getattr(dfa, op)(example_op_collection)
+            == lt.DataFrame(
+                [
+                    [getattr(abs(a), op)(abs(example_op_collection[j])) for j, a in enumerate(row)]
+                    for row in example_op_a
+                ]
+            )
+        ).all(axis=None)
 
-#         # Collection
-#         sa = lt.DataFrame(example_list_dict_a)
-#         assert (getattr(sa, op)(example_values) == getattr(psa, op)(np.array(example_values))).all()
-#         # Pandads is deprecating logical ops for dtype-less sequqences (eg: list, tuple)
-
-#     @pytest.mark.parametrize(
-#         "op",
-#         [
-#             "__divmod__",
-#             "__lshift__",
-#             "__rshift__",
-#             "__rdivmod__",
-#             "__rlshift__",
-#             "__rrshift__",
-#         ],
-#     )
-#     def test_rop(self, op):
-#         # DataFrame
-#         sa = lt.DataFrame(example_list_dict_a)
-#         sb = lt.DataFrame(example_list_dict_b)
-#         assert getattr(sa, op)(sb) == {k: getattr(v, op)(example_list_dict_b[k]) for k, v in example_list_dict_a.items()}
-
-#         # Scalar
-#         sa = lt.DataFrame(example_list_dict_a)
-#         assert getattr(sa, op)(example_scalar) == {k: getattr(v, op)(example_scalar) for k, v in example_list_dict_a.items()}
-
-#         # Collection
-#         sa = lt.DataFrame(example_list_dict_a)
-#         assert getattr(sa, op)(example_values) == {
-#             k: getattr(v, op)(example_values[i]) for i, (k, v) in enumerate(example_list_dict_a.items())
-#         }
 
 #     @pytest.mark.parametrize(
 #         "iop",
