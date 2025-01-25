@@ -1204,6 +1204,39 @@ class DataFrame(UserDict):
             case _:
                 return self.agg(method, axis)
 
+    def map(self, func: Callable) -> DataFrame:
+        """
+        Applies a function to each value in the DataFrame.
+
+        Args:
+            func (Callable): The function to apply.
+
+        Returns:
+            DataFrame: A new DataFrame with the results of the function applied.
+        """
+        return DataFrame({col: s.map(func) for col, s in self.items()})
+
+    def astype(self, new_type: type) -> DataFrame:
+        """
+        Casts the DataFrame to a new type.
+
+        Args:
+            new_type (type): The type to cast to.
+
+        Returns:
+            DataFrame: A new DataFrame with the values cast to the new type.
+        """
+        return self.map(new_type)
+
+    def abs(self) -> DataFrame:
+        """
+        Returns the absolute values for DataFrame
+
+        Returns:
+            DataFrame: Absolute values DataFrame
+        """
+        return self.map(abs)
+
     @overload
     def max(self, axis: Axis) -> Series: ...  # no cov
     @overload
@@ -1520,3 +1553,14 @@ class DataFrame(UserDict):
     ###########################################################################
     # Unary Operators
     ###########################################################################
+    def __neg__(self) -> DataFrame:
+        return DataFrame({col: -s for col, s in self.items()})
+
+    def __pos__(self) -> DataFrame:
+        return DataFrame({col: +s for col, s in self.items()})
+
+    def __abs__(self) -> DataFrame:
+        return self.abs()
+
+    def __invert__(self) -> DataFrame:
+        return DataFrame({col: ~s for col, s in self.items()})

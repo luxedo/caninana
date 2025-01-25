@@ -32,6 +32,7 @@ c  3
 name: snake
 """
 example_stats = [0, 1, 2, 3, 4, 5, 6, 6]
+example_unary = [-3, -1, 0, 1, 2]
 
 
 class TestSeriesInit:
@@ -616,25 +617,21 @@ class TestSeriesOperators:
 
 class TestSeriesUnaryOperators:
     def test_neg(self):
-        values = [-1, 0, 1]
-        s = lt.Series(values)
-        ps = pd.Series(values)
+        s = lt.Series(example_unary)
+        ps = pd.Series(example_unary)
         assert_series_equal_pandas(-s, -ps)
 
     def test_pos(self):
-        values = [-1, 0, 1]
-        s = lt.Series(values)
-        ps = pd.Series(values)
+        s = lt.Series(example_unary)
+        ps = pd.Series(example_unary)
         assert_series_equal_pandas(+s, +ps)
 
     def test_abs(self):
-        values = [-1, 0, 1]
-        s = lt.Series(values)
-        ps = pd.Series(values)
+        s = lt.Series(example_unary)
+        ps = pd.Series(example_unary)
         assert_series_equal_pandas(abs(s), abs(ps))
 
     def test_invert(self):
-        values = [-1, 0, 1]
-        s = lt.Series(values)
-        ps = pd.Series(values)
+        s = lt.Series(example_unary)
+        ps = pd.Series(example_unary)
         assert_series_equal_pandas(~s, ~ps)

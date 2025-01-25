@@ -35,6 +35,7 @@ example_dict_series_pd = {
 example_scalar = 3
 example_cmp_a = [0, 1, 3]
 example_cmp_b = [1, 2, 3]
+example_unary = [-3, -1, 0, 1, 2]
 
 
 class TestDataFrameInit:
@@ -495,21 +496,24 @@ class TestDataFrameMapReduce:
         with pytest.raises(ValueError, match=match):
             lt.DataFrame(example_list_dict).apply(lambda x: x, axis=-1)
 
+    # def test_any(self):
+    #     df = lt.DataFrame([0, 1, 2])
+    #     pdf = pd.DataFrame([0, 1, 2])
+    #     assert df.any() == pdf.any()
+    #     df = lt.DataFrame([0])
+    #     pdf = pd.DataFrame([0])
+    #     assert df.any() == pdf.any()
 
-# def test_any(self):
-#     df = lt.DataFrame([0, 1, 2])
-#     pdf = pd.DataFrame([0, 1, 2])
-#     assert df.any() == pdf.any()
-#     df = lt.DataFrame([0])
-#     pdf = pd.DataFrame([0])
-#     assert df.any() == pdf.any()
+    def test_astype(self):
+        df = lt.DataFrame(example_list_dict)
+        pdf = pd.DataFrame(example_list_dict)
+        assert_dataframe_equal_pandas(df.astype(str), pdf.astype(str))
 
-# def test_astype(self):
-#     df = lt.DataFrame(example_list_dict)
-#     pdf = pd.DataFrame(example_list_dict)
-#     print(df.astype(str))
-#     print(pdf.astype(str))
-#     assert (df.astype(str) == pdf.astype(str)).all()
+    def test_abs(self):
+        df = lt.DataFrame(example_list_dict)
+        pdf = pd.DataFrame(example_list_dict)
+        assert_dataframe_equal_pandas(df.abs(), pdf.abs())
+
 
 #     @pytest.mark.parametrize(
 #         "func",
@@ -842,27 +846,23 @@ class TestDataFrameComparisons:
 #             sa + sb
 
 
-# class TestDataFrameUnaryOperators:
-#     def test_neg(self):
-#         valuedf = [-1, 0, 1]
-#         df = lt.DataFrame(values)
-#         pdf = pd.DataFrame(values)
-#         assert (-df == -ps).all()
+class TestDataFrameUnaryOperators:
+    def test_neg(self):
+        df = lt.DataFrame(example_unary)
+        pdf = pd.DataFrame(example_unary)
+        assert_dataframe_equal_pandas(-df, -pdf)
 
-#     def test_pos(self):
-#         valuedf = [-1, 0, 1]
-#         df = lt.DataFrame(values)
-#         pdf = pd.DataFrame(values)
-#         assert (+df == +ps).all()
+    def test_pos(self):
+        df = lt.DataFrame(example_unary)
+        pdf = pd.DataFrame(example_unary)
+        assert_dataframe_equal_pandas(+df, +pdf)
 
-#     def test_abs(self):
-#         valuedf = [-1, 0, 1]
-#         df = lt.DataFrame(values)
-#         pdf = pd.DataFrame(values)
-#         assert (abs(s) == abs(ps)).all()
+    def test_abs(self):
+        df = lt.DataFrame(example_unary)
+        pdf = pd.DataFrame(example_unary)
+        assert_dataframe_equal_pandas(abs(df), abs(pdf))
 
-#     def test_invert(self):
-#         valuedf = [-1, 0, 1]
-#         df = lt.DataFrame(values)
-#         pdf = pd.DataFrame(values)
-#         assert (~df == ~ps).all()
+    def test_invert(self):
+        df = lt.DataFrame(example_unary)
+        pdf = pd.DataFrame(example_unary)
+        assert_dataframe_equal_pandas(~df, ~pdf)
