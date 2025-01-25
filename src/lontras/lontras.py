@@ -1410,13 +1410,100 @@ class DataFrame(UserDict):
         if set(self.keys()) != set(other.keys()):
             msg = "Can only compare identically-labeled (both index and columns) DataFrame objects"
             raise ValueError(msg)
-        return DataFrame([getattr(s, op)(other[col]) for col, s in self.items()])
+        return DataFrame({col: getattr(s, op)(other[col]) for col, s in self.items()})
 
     def _op_scalar(self, op: str, other: Collection[Any] | Scalar) -> DataFrame:
         return DataFrame({col: getattr(s, op)(other) for col, s in self.items()})
 
+    def __lt__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:  # type: ignore
+        """
+        Element-wise less than comparison.
+
+        Compares each value in the DataFrame with the corresponding value in `other`.
+
+        Args:
+            other (DataFrame | Series | Collection | Scalar): The other DataFrame Series,
+                Collection, or Scalar to compare with.
+
+        Returns:
+            DataFrame: A DataFrame of boolean values indicating the result of the comparison.
+        """
+        return self.op("__lt__", other)
+
+    def __le__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:  # type: ignore
+        """
+        Element-wise less than or equal to comparison.
+
+        Compares each value in the DataFrame with the corresponding value in `other`.
+
+        Args:
+            other (DataFrame | Series | Collection | Scalar): The other DataFrame Series,
+                Collection, or Scalar to compare with.
+
+        Returns:
+            DataFrame: A DataFrame of boolean values indicating the result of the comparison.
+        """
+        return self.op("__le__", other)
+
     def __eq__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:  # type: ignore
+        """
+        Element-wise equality comparison.
+
+        Compares each value in the DataFrame with the corresponding value in `other`.
+
+        Args:
+            other (DataFrame | Series | Collection | Scalar): The other DataFrame Series,
+                Collection, or Scalar to compare with.
+
+        Returns:
+            DataFrame: A DataFrame of boolean values indicating the result of the comparison.
+        """
         return self.op("__eq__", other)
+
+    def __ne__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:  # type: ignore
+        """
+        Element-wise inequality comparison.
+
+        Compares each value in the DataFrame with the corresponding value in `other`.
+
+        Args:
+            other (DataFrame | Series | Collection | Scalar): The other DataFrame Series,
+                Collection, or Scalar to compare with.
+
+        Returns:
+            DataFrame: A DataFrame of boolean values indicating the result of the comparison.
+        """
+        return self.op("__ne__", other)
+
+    def __gt__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:  # type: ignore
+        """
+        Element-wise greater than comparison.
+
+        Compares each value in the DataFrame with the corresponding value in `other`.
+
+        Args:
+            other (DataFrame | Series | Collection | Scalar): The other DataFrame Series,
+                Collection, or Scalar to compare with.
+
+        Returns:
+            DataFrame: A DataFrame of boolean values indicating the result of the comparison.
+        """
+        return self.op("__gt__", other)
+
+    def __ge__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:  # type: ignore
+        """
+        Element-wise greater than or equal to comparison.
+
+        Compares each value in the DataFrame with the corresponding value in `other`.
+
+        Args:
+            other (DataFrame | Series | Collection | Scalar): The other DataFrame Series,
+                Collection, or Scalar to compare with.
+
+        Returns:
+            DataFrame: A DataFrame of boolean values indicating the result of the comparison.
+        """
+        return self.op("__ge__", other)
 
     ###########################################################################
     # Operators

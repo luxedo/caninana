@@ -33,6 +33,8 @@ example_dict_series_pd = {
     "col_b": pd.Series([4, 5, 6], index=example_index),
 }
 example_scalar = 3
+example_cmp_a = [0, 1, 3]
+example_cmp_b = [1, 2, 3]
 
 
 class TestDataFrameInit:
@@ -665,51 +667,35 @@ class TestDataFrameComparisons:
         pdf = pd.DataFrame(example_list_dict) == cmp_list
         assert_dataframe_equal_pandas(df, pdf)
 
-    #     def test_lt_ge(self):
-    #         sa = lt.DataFrame([0, 1])
-    #         sb = lt.DataFrame([1, 2])
-    #         psa = pd.DataFrame([0, 1])
-    #         psb = pd.DataFrame([1, 2])
-    #         assert ((sa < sb) == (psa < psb)).all()
-    #         assert ((sa >= sb) == (psa >= psb)).all()
+    def test_lt_ge(self):
+        dfa = lt.DataFrame(example_cmp_a)
+        dfb = lt.DataFrame(example_cmp_b)
+        pdfa = pd.DataFrame(example_cmp_a)
+        pdfb = pd.DataFrame(example_cmp_b)
+        assert_dataframe_equal_pandas(dfa < dfb, pdfa < pdfb)
+        assert_dataframe_equal_pandas(dfa >= dfb, pdfa >= pdfb)
 
-    #     def test_le_gt(self):
-    #         sa = lt.DataFrame([0, 1])
-    #         sb = lt.DataFrame([0, 2])
-    #         psa = pd.DataFrame([0, 1])
-    #         psb = pd.DataFrame([0, 2])
-    #         assert ((sa <= sb) == (psa <= psb)).all()
-    #         assert ((sa > sb) == (psa > psb)).all()
+    def test_le_gt(self):
+        dfa = lt.DataFrame(example_cmp_a)
+        dfb = lt.DataFrame(example_cmp_b)
+        pdfa = pd.DataFrame(example_cmp_a)
+        pdfb = pd.DataFrame(example_cmp_b)
+        assert_dataframe_equal_pandas(dfa > dfb, pdfa > pdfb)
+        assert_dataframe_equal_pandas(dfa <= dfb, pdfa <= pdfb)
 
-    # def test_eq_dataframe(self):
-    #     sa = lt.DataFrame([0, 1])
-    #     sb = lt.DataFrame([0, 1])
-    #     psa = pd.DataFrame([0, 1])
-    #     psb = pd.DataFrame([0, 1])
-    #     print()
-    #     print(sa == sb)
-    #     print(psa == psb)
-    # print( ((sa == sb) == (psa == psb)).all()
-    # assert ((sa == sb) == (psa == psb)).all()
+    def test_eq_dataframe(self):
+        dfa = lt.DataFrame(example_cmp_a)
+        dfb = lt.DataFrame(example_cmp_b)
+        pdfa = pd.DataFrame(example_cmp_a)
+        pdfb = pd.DataFrame(example_cmp_b)
+        assert_dataframe_equal_pandas(dfa == dfb, pdfa == pdfb)
 
-
-#         sa = lt.DataFrame([0, 1])
-#         sb = lt.DataFrame([0, 2])
-#         psa = pd.DataFrame([0, 1])
-#         psb = pd.DataFrame([0, 2])
-#         assert ((sa == sb) == (psa == psb)).all()
-
-#     def test_ne(self):
-#         sa = lt.DataFrame([0, 1])
-#         sb = lt.DataFrame([1, 2])
-#         psa = pd.DataFrame([0, 1])
-#         psb = pd.DataFrame([1, 2])
-#         assert ((sa != sb) == (psa != psb)).all()
-#         sa = lt.DataFrame([0, 1])
-#         sb = lt.DataFrame([0, 1])
-#         psa = pd.DataFrame([0, 1])
-#         psb = pd.DataFrame([0, 1])
-#         assert ((sa != sb) == (psa != psb)).all()
+    def test_ne(self):
+        dfa = lt.DataFrame(example_cmp_a)
+        dfb = lt.DataFrame(example_cmp_b)
+        pdfa = pd.DataFrame(example_cmp_a)
+        pdfb = pd.DataFrame(example_cmp_b)
+        assert_dataframe_equal_pandas(dfa != dfb, pdfa != pdfb)
 
 
 # class TestDataFrameOperators:
