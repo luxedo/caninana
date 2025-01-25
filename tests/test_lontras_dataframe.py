@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: MIT
 
+import statistics
 
 import pandas as pd
 import pytest
@@ -482,6 +483,11 @@ class TestDataFrameMapReduce:
         else:
             assert_scalar_equal(getattr(df, func)(axis=None), getattr(pdf, func)(axis=None))
 
+    def test_agg_wrong_axis(self):
+        match = "No axis named"
+        with pytest.raises(ValueError, match=match):
+            lt.DataFrame(example_list_dict).agg(lambda x: x, axis=-1)
+
     def test_apply_wrong_axis(self):
         match = "No axis named"
         with pytest.raises(ValueError, match=match):
@@ -518,54 +524,58 @@ class TestDataFrameMapReduce:
 #             getattr(s, func)()
 
 
-# class TestDataFrameStatistics:
-#     @pytest.mark.parametrize(
-#         "func",
-#         [
-#             "mean",
-#             "fmean",
-#             "geometric_mean",
-#             "harmonic_mean",
-#             # "kde",
-#             # "kde_random",
-#             "median",
-#             "mode",
-#             "multimode",
-#             "quantiles",
-#             "pstdev",
-#             "pvariance",
-#             "stdev",
-#             "variance",
-#         ],
-#     )
-#     def test_statistics(self, func):
-#         df = lt.DataFrame(example_list_dict)
-#         assert getattr(s, func)() == getattr(statistics, func)(example_list_dict.values())
+class TestDataFrameStatistics:
+    @pytest.mark.parametrize(
+        "func",
+        [
+            "mean",
+            "median",
+            # "mode",
+            "std",
+            "var",
+        ],
+    )
+    def test_statistics(self, func):
+        df = lt.DataFrame(example_list_dict)
+        pdf = pd.DataFrame(example_list_dict)
+        assert getattr(df, func)() == getattr(pdf, func)()
+        assert getattr(df, func)(axis=0) == getattr(pdf, func)(axis=0)
+        assert getattr(df, func)(axis=1) == getattr(pdf, func)(axis=1)
+        if func in ["std", "var"]:
+            # The behavior of std and var with axis=None is deprecated
+            assert getattr(df, func)(axis=None) == getattr(getattr(pdf, func)(), func)()
+        else:
+            assert getattr(df, func)(axis=None) == getattr(pdf, func)(axis=None)
 
-#     # @pytest.mark.parametrize(
-#     #     "func",
-#     #     [
-#     #         "covariance",
-#     #         "correlation",
-#     #         "linear_regression",
-#     #     ],
-#     # )
-#     # def test_statistics_other(self, func):
-#     #     sa = lt.DataFrame(example_list_dict_a)
-#     #     sb = lt.DataFrame(example_list_dict_b)
-#     #     assert getattr(sa, func)(sb) == getattr(statistics, func)(example_list_dict_a.values(), example_list_dict_b.values())
+    def test_statistics_mode(self):
+        # @TODO: This is a mess
+        example_mode_input = [[0, 1, 1], [2, 2, 1], [3, 3, 2], [0, 0, 2], [1, 2, 1]]
+        df = lt.DataFrame(example_mode_input)
+        pdf = pd.DataFrame(example_mode_input)
+        assert_series_equal_pandas(df.mode(axis=0), pdf.mode(axis=0).T[0].rename(None))
+        assert_series_equal_pandas(df.mode(axis=1), pdf.mode(axis=1)[0].rename(None))
+
+    def test_statistics_quantiles(self):
+        df = lt.DataFrame(example_list_dict)
+        transposed = lt.DataFrame(example_list_dict).T.values
+        assert df.quantiles(axis=0).values == [statistics.quantiles(row) for row in transposed]
+        assert df.quantiles(axis=1).values == [statistics.quantiles(row.values()) for row in example_list_dict]
 
 
-# class TestDataFrameExports:
-#     def test_to_list(self):
-#         df = lt.DataFrame(example_list_dict)
-#         pdf = pd.DataFrame(example_list_dict)
-#         assert df.to_list() == pdf.to_list()
+class TestDataFrameExports:
+    def test_to_list(self):
+        df = lt.DataFrame(example_list_dict)
+        pdf = pd.DataFrame(example_list_dict)
+        assert df.to_list() == pdf.values.tolist()
 
-#     def test_to_dict(self):
-#         df = lt.DataFrame(example_list_dict)
-#         pdf = pd.DataFrame(example_list_dict)
-#         assert df.to_dict() == pdf.to_dict()
+    def test_to_dict(self):
+        df = lt.DataFrame(example_list_dict)
+        pdf = pd.DataFrame(example_list_dict)
+        assert df.to_dict() == pdf.to_dict()
+        assert df.to_dict(orient="dict") == pdf.to_dict(orient="dict")
+        assert df.to_dict(orient="list") == pdf.to_dict(orient="list")
+        assert df.to_dict(orient="records") == pdf.to_dict(orient="records")
+        assert_exception(lambda: pdf.to_dict(orient="error"), lambda: df.to_dict(orient="error"), ValueError)
 
 
 class TestDataFrameComparisons:

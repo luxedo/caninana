@@ -6,7 +6,6 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING
 
-import numpy as np
 import pytest
 
 if TYPE_CHECKING:
@@ -37,7 +36,7 @@ def assert_dataframe_equal_pandas(df: lt.DataFrame, pdf: pd.DataFrame):
 
 def assert_series_equal_pandas(s: lt.Series, ps: pd.Series):
     assert len(s) == len(ps)
-    assert (s.index == ps.index).all() is np.True_  # type: ignore
+    assert (list(s.index) == list(ps.index)) is True
     assert s.name == ps.name
     assert (s == ps).all() is True
     assert (ps.to_dict() == s.to_dict()) is True

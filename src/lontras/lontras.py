@@ -225,10 +225,10 @@ class Series(UserDict):
     @property
     def values(self) -> list[Any]:  # type: ignore
         """
-        Returns the index of the Series.
+        Return a list representation of the Series.
 
         Returns:
-            Index: The index of the Series.
+            list: The values of the Series.
         """
         return list(self.data.values())
 
@@ -309,7 +309,7 @@ class Series(UserDict):
         return None
 
     ###########################################################################
-    # Operations and Comparisons Auxiliary Functions
+    # Auxiliary Functions
     ###########################################################################
     def _other_as_series(self, other: Series | Scalar | Collection) -> Series:
         """Converts other to a Series if it is not already. Used for operations."""
@@ -391,7 +391,16 @@ class Series(UserDict):
         Returns:
             Series: A new Series with the values cast to the new type.
         """
-        return self.copy(deep=True).map(new_type)
+        return self.map(new_type)
+
+    def abs(self) -> Series:
+        """
+        Returns the absolute values for Series
+
+        Returns:
+            Series: Absolute values Series
+        """
+        return self.map(abs)
 
     def max(self):
         """
@@ -498,33 +507,6 @@ class Series(UserDict):
         """
         return self.agg(statistics.mean)
 
-    def fmean(self, weights=None) -> Scalar:
-        """
-        Convert data to floats and compute the arithmetic mean.
-
-        Returns:
-            float: Series mean
-        """
-        return self.agg(lambda values: statistics.fmean(values, weights))
-
-    def geometric_mean(self) -> Scalar:
-        """
-        Convert data to floats and compute the geometric mean.
-
-        Returns:
-            float: Series geometric mean
-        """
-        return self.agg(statistics.geometric_mean)
-
-    def harmonic_mean(self, weights=None) -> Scalar:
-        """
-        Convert data to floats and compute the harmonic mean.
-
-        Returns:
-            float: Series harmonic mean
-        """
-        return self.agg(lambda values: statistics.harmonic_mean(values, weights))
-
     def median(self) -> Scalar:
         """
         Return the median (middle value) of numeric data, using the common “mean of middle two” method.
@@ -545,18 +527,7 @@ class Series(UserDict):
         """
         return self.agg(statistics.mode)
 
-    def multimode(self) -> Scalar:
-        """
-        Return a list of the most frequently occurring values in the order they were first encountered
-        in the data. Will return more than one result if there are multiple modes or an empty list if
-        the data is empty:
-
-        Returns:
-            list[Any]: List containing modes
-        """
-        return self.agg(statistics.multimode)
-
-    def quantiles(self, *, n=4, method: Literal["exclusive", "inclusive"] = "exclusive") -> Scalar:
+    def quantiles(self, *, n=4, method: Literal["exclusive", "inclusive"] = "exclusive") -> Collection[float]:
         """
         Divide data into n continuous intervals with equal probability. Returns a list of `n - 1`
         cut points separating the intervals.
@@ -566,29 +537,7 @@ class Series(UserDict):
         """
         return self.agg(lambda values: statistics.quantiles(values, n=n, method=method))
 
-    def pstdev(self, mu=None) -> Scalar:
-        """
-        Return the population standard deviation (the square root of the population variance).
-        See pvariance() for arguments and other details.
-
-        Returns:
-            float: Series population standard deviation
-        """
-        return self.agg(lambda values: statistics.pstdev(values, mu=mu))
-
-    def pvariance(self, mu=None) -> Scalar:
-        """
-        Return the population variance of data, a non-empty sequence or iterable of real-valued
-        numbers. Variance, or second moment about the mean, is a measure of the variability
-        (spread or dispersion) of data. A large variance indicates that the data is spread out;
-        a small variance indicates it is clustered closely around the mean.
-
-        Returns:
-            float: Series population variance
-        """
-        return self.agg(lambda values: statistics.pvariance(values, mu=mu))
-
-    def stdev(self, xbar=None) -> Scalar:
+    def std(self, xbar=None) -> Scalar:
         """
         Return the sample standard deviation (the square root of the sample variance).
         See variance() for arguments and other details.
@@ -598,7 +547,7 @@ class Series(UserDict):
         """
         return self.agg(lambda values: statistics.stdev(values, xbar=xbar))
 
-    def variance(self, xbar=None) -> Scalar:
+    def var(self, xbar=None) -> Scalar:
         """
         Return the sample variance of data, an iterable of at least two real-valued numbers.
         Variance, or second moment about the mean, is a measure of the variability
@@ -609,25 +558,6 @@ class Series(UserDict):
             float: Series variance
         """
         return self.agg(lambda values: statistics.variance(values, xbar=xbar))
-
-    # def covariance(self, other: Series, /):
-    #     self._match_index(other)
-    #     x = list(self.values)
-    #     y = [other[k] for k in self.index]
-    #     return statistics.covariance(x, y)
-
-    # # def correlation(self, other: Series, /, *, method: Literal["linear"] = "linear"):
-    # def correlation(self, other: Series, /):
-    #     self._match_index(other)
-    #     x = list(self.values)
-    #     y = [other[k] for k in self.index]
-    #     return statistics.correlation(x, y)
-
-    # def linear_regression(self, other: Series, /, *, proportional: bool = False):
-    #     self._match_index(other)
-    #     x = list(self.values)
-    #     y = [other[k] for k in self.index]
-    #     return statistics.linear_regression(x, y, proportional=proportional)
 
     ###########################################################################
     # Exports
@@ -1067,7 +997,7 @@ class Series(UserDict):
         return Series({k: +v for k, v in self.items()})
 
     def __abs__(self) -> Series:
-        return Series({k: abs(v) for k, v in self.items()})
+        return self.abs()
 
     def __invert__(self) -> Series:
         return Series({k: ~v for k, v in self.items()})
@@ -1217,12 +1147,29 @@ class DataFrame(UserDict):
 
     @property
     def T(self) -> DataFrame:  # noqa: N802
-        data = list(self.values())
+        data = list(self.data.values())
         return DataFrame(data, index=self.columns[:], columns=self.index[:])
+
+    @property
+    def values(self) -> list[list[Any]]:  # type: ignore
+        """
+        Return a list representation of the DataFrame.
+
+        Returns:
+            list: The values of the DataFrame.
+        """
+        return self.to_list()
 
     def iterrows(self) -> Generator[tuple[Hashable, Series]]:
         yield from self.T.items()
 
+    ###########################################################################
+    # Accessors
+    ###########################################################################
+
+    ###########################################################################
+    # Apply/Agg/Map/Reduce
+    ###########################################################################
     def apply(self, method: Callable[[Series], Any], axis: Axis = 0) -> Series:
         match axis:
             case int(c) if c == AxisRows:
@@ -1239,6 +1186,23 @@ class DataFrame(UserDict):
                 return method(self.apply(method, 0))
             case _:
                 return self.apply(method, axis)
+
+    def agg(self, method: Callable[[Collection[Any]], Any], axis: Axis = 0) -> Series:
+        match axis:
+            case int(c) if c == AxisRows:
+                return Series({col: method(s.values) for col, s in self.items()})
+            case int(c) if c == AxisCols:
+                return self.T.agg(method, axis=0)
+            case _:
+                msg = f"No axis named {axis} for object type DataFrame"
+                raise ValueError(msg)
+
+    def _agg_with_none(self, method: Callable[[Collection[Any]], Any], axis: AxisOrNone = 0):
+        match axis:
+            case None:
+                return method(self.agg(method, 0).values)
+            case _:
+                return self.agg(method, axis)
 
     @overload
     def max(self, axis: Axis) -> Series: ...  # no cov
@@ -1288,6 +1252,133 @@ class DataFrame(UserDict):
     def idxmin(self, axis: None = ...) -> bool: ...  # no cov
     def idxmin(self, axis: AxisOrNone = 0) -> Series | bool:
         return self._apply_with_none(lambda s: s.idxmin(), axis)
+
+    ###########################################################################
+    # Statistics
+    ###########################################################################
+    def mean(self, axis: AxisOrNone = 0) -> Scalar:
+        """
+        Computes the mean of the Series.
+
+        Returns:
+            float: Series mean
+        """
+        return self._agg_with_none(statistics.mean, axis=axis)
+
+    def median(self, axis: AxisOrNone = 0) -> Scalar:
+        """
+        Return the median (middle value) of numeric data, using the common “mean of middle two” method.
+        If data is empty, StatisticsError is raised. data can be a sequence or iterable.
+
+        Returns:
+            float | int: Series median
+        """
+        return self._agg_with_none(statistics.median, axis=axis)
+
+    def mode(self, axis: Axis = 0) -> Series:
+        """
+        Return the single most common data point from discrete or nominal data. The mode (when it exists)
+        is the most typical value and serves as a measure of central location.
+
+        Returns:
+            Any: Series mode
+        """
+        # @TOOO: Improve this. Might have to implement NaNs
+        return self.agg(statistics.mode, axis=axis)
+
+    def quantiles(self, *, n=4, method: Literal["exclusive", "inclusive"] = "exclusive", axis: Axis = 0) -> Series:
+        """
+        Divide data into n continuous intervals with equal probability. Returns a list of `n - 1`
+        cut points separating the intervals.
+
+        Returns:
+            list[float]: List containing quantiles
+        """
+        return self.agg(lambda values: statistics.quantiles(values, n=n, method=method), axis=axis)
+
+    def std(self, xbar=None, axis: AxisOrNone = 0) -> Scalar:
+        """
+        Return the sample standard deviation (the square root of the sample variance).
+        See variance() for arguments and other details.
+
+        Returns:
+            float: Series standard deviation
+        """
+        return self._agg_with_none(lambda values: statistics.stdev(values, xbar=xbar), axis=axis)
+
+    def var(self, xbar=None, axis: AxisOrNone = 0) -> Scalar:
+        """
+        Return the sample variance of data, an iterable of at least two real-valued numbers.
+        Variance, or second moment about the mean, is a measure of the variability
+        (spread or dispersion) of data. A large variance indicates that the data is spread out;
+        a small variance indicates it is clustered closely around the mean.
+
+        Returns:
+            float: Series variance
+        """
+        return self._agg_with_none(lambda values: statistics.variance(values, xbar=xbar), axis=axis)
+
+    ###########################################################################
+    # Exports
+    ###########################################################################
+    def to_list(self) -> list[list[Any]]:
+        """
+        Converts the DataFrame to a list.
+
+        Returns:
+            list[list[Any]]: A list of the Series values.
+        """
+        return list(self.apply(lambda s: s.values, axis=1).data.values())
+
+    @overload
+    def to_dict(self) -> dict[Hashable, dict[Hashable, Any]]: ...  # no cov
+    @overload
+    def to_dict(self, orient: Literal["dict"]) -> dict[Hashable, dict[Hashable, Any]]: ...  # no cov
+    @overload
+    def to_dict(self, orient: Literal["list"]) -> dict[Hashable, list[Any]]: ...  # no cov
+    @overload
+    def to_dict(self, orient: Literal["records"]) -> list[dict[Hashable, Any]]: ...  # no cov
+    def to_dict(self, orient: Literal["dict", "list", "records"] = "dict"):
+        """
+        Converts the DataFrame to a dictionary.
+
+        Args:
+            orient str {`dict`, `list`, `records`}: Determines the type of the values of the
+                dictionary.
+
+        Returns:
+            dict[Hashable, Any]: A dictionary representation of the Series.
+        """
+        match orient:
+            case "dict":
+                return self.apply(lambda s: s.to_dict()).data
+            case "list":
+                return self.apply(lambda s: s.to_list()).data
+            case "records":
+                return list(self.apply(lambda s: s.to_dict(), axis=1).values)
+            case _:
+                msg = f"orient '{orient}' not understood"
+                raise ValueError(msg)
+
+    ###########################################################################
+    # Comparisons
+    ###########################################################################
+
+    ###########################################################################
+    # Operators
+    ###########################################################################
+
+    ###########################################################################
+    # Right-hand Side Operators
+    ###########################################################################
+
+    ###########################################################################
+    # In-place Operators
+    ###########################################################################
+
+    ###########################################################################
+    # Unary Operators
+    ###########################################################################
 
     def op(
         self, op: str, other: DataFrame | Series | Mapping | Collection | Scalar

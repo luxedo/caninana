@@ -31,6 +31,7 @@ b  2
 c  3
 name: snake
 """
+example_stats = [0, 1, 2, 3, 4, 5, 6, 6]
 
 
 class TestSeriesInit:
@@ -325,7 +326,7 @@ class TestSeriesMapReduce:
     def test_map(self):
         s = lt.Series(example_dict)
         ps = pd.Series(example_dict)
-        assert (s.map(lambda x: x**2) == ps.map(lambda x: x**2)).all()
+        assert_series_equal_pandas(s.map(lambda x: x**2), ps.map(lambda x: x**2))
 
     def test_reduce(self):
         s = lt.Series(example_dict)
@@ -368,7 +369,12 @@ class TestSeriesMapReduce:
     def test_astype(self):
         s = lt.Series(example_dict)
         ps = pd.Series(example_dict)
-        assert (s.astype(str) == ps.astype(str)).all()
+        assert_series_equal_pandas(s.astype(str), ps.astype(str))
+
+    def test_abs(self):
+        s = lt.Series(example_dict)
+        ps = pd.Series(example_dict)
+        assert_series_equal_pandas(s.abs(), ps.abs())
 
     @pytest.mark.parametrize(
         "func",
@@ -390,37 +396,24 @@ class TestSeriesStatistics:
         "func",
         [
             "mean",
-            "fmean",
-            "geometric_mean",
-            "harmonic_mean",
-            # "kde",
-            # "kde_random",
             "median",
-            "mode",
-            "multimode",
-            "quantiles",
-            "pstdev",
-            "pvariance",
-            "stdev",
-            "variance",
+            "std",
+            "var",
         ],
     )
     def test_statistics(self, func):
-        s = lt.Series(example_dict)
-        assert getattr(s, func)() == getattr(statistics, func)(example_dict.values())
+        s = lt.Series(example_stats)
+        ps = pd.Series(example_stats)
+        assert getattr(s, func)() == getattr(ps, func)()
 
-    # @pytest.mark.parametrize(
-    #     "func",
-    #     [
-    #         "covariance",
-    #         "correlation",
-    #         "linear_regression",
-    #     ],
-    # )
-    # def test_statistics_other(self, func):
-    #     sa = lt.Series(example_dict_a)
-    #     sb = lt.Series(example_dict_b)
-    #     assert getattr(sa, func)(sb) == getattr(statistics, func)(example_dict_a.values(), example_dict_b.values())
+    def test_statistics_mode(self):
+        s = lt.Series(example_stats)
+        ps = pd.Series(example_stats)
+        assert s.mode() == ps.mode().iloc[0]
+
+    def test_statistics_quantiles(self):
+        s = lt.Series(example_stats)
+        assert s.quantiles() == statistics.quantiles(example_stats)
 
 
 class TestSeriesExports:
@@ -441,40 +434,40 @@ class TestSeriesComparisons:
         sb = lt.Series([1, 2])
         psa = pd.Series([0, 1])
         psb = pd.Series([1, 2])
-        assert ((sa < sb) == (psa < psb)).all()
-        assert ((sa >= sb) == (psa >= psb)).all()
+        assert_series_equal_pandas(sa < sb, psa < psb)
+        assert_series_equal_pandas(sa >= sb, psa >= psb)
 
     def test_le_gt(self):
         sa = lt.Series([0, 1])
         sb = lt.Series([0, 2])
         psa = pd.Series([0, 1])
         psb = pd.Series([0, 2])
-        assert ((sa <= sb) == (psa <= psb)).all()
-        assert ((sa > sb) == (psa > psb)).all()
+        assert_series_equal_pandas(sa > sb, psa > psb)
+        assert_series_equal_pandas(sa <= sb, psa <= psb)
 
     def test_eq(self):
         sa = lt.Series([0, 1])
         sb = lt.Series([0, 1])
         psa = pd.Series([0, 1])
         psb = pd.Series([0, 1])
-        assert ((sa == sb) == (psa == psb)).all()
+        assert_series_equal_pandas(sa == sb, psa == psb)
         sa = lt.Series([0, 1])
         sb = lt.Series([0, 2])
         psa = pd.Series([0, 1])
         psb = pd.Series([0, 2])
-        assert ((sa == sb) == (psa == psb)).all()
+        assert_series_equal_pandas(sa == sb, psa == psb)
 
     def test_ne(self):
         sa = lt.Series([0, 1])
         sb = lt.Series([1, 2])
         psa = pd.Series([0, 1])
         psb = pd.Series([1, 2])
-        assert ((sa != sb) == (psa != psb)).all()
+        assert_series_equal_pandas(sa != sb, psa != psb)
         sa = lt.Series([0, 1])
         sb = lt.Series([0, 1])
         psa = pd.Series([0, 1])
         psb = pd.Series([0, 1])
-        assert ((sa != sb) == (psa != psb)).all()
+        assert_series_equal_pandas(sa != sb, psa != psb)
 
 
 class TestSeriesOperators:
@@ -504,11 +497,11 @@ class TestSeriesOperators:
         psb = pd.Series(example_dict_b)
 
         # Series
-        assert (getattr(sa, op)(sb) == getattr(psa, op)(psb)).all()
+        assert_series_equal_pandas(getattr(sa, op)(sb), getattr(psa, op)(psb))
         # Scalar
-        assert (getattr(sa, op)(example_scalar) == getattr(psa, op)(example_scalar)).all()
+        assert_series_equal_pandas(getattr(sa, op)(example_scalar), getattr(psa, op)(example_scalar))
         # Collection
-        assert (getattr(sa, op)(example_values) == getattr(psa, op)(example_values)).all()
+        assert_series_equal_pandas(getattr(sa, op)(example_values), getattr(psa, op)(example_values))
 
     def test_matmul(self):
         sa = lt.Series(example_dict_a)
@@ -538,15 +531,15 @@ class TestSeriesOperators:
         sb = lt.Series(example_dict_b)
         psa = pd.Series(example_dict_a)
         psb = pd.Series(example_dict_b)
-        assert (getattr(sa, op)(sb) == getattr(psa, op)(psb)).all()
+        assert_series_equal_pandas(getattr(sa, op)(sb), getattr(psa, op)(psb))
 
         # Scalar
         sa = lt.Series(example_dict_a)
-        assert (getattr(sa, op)(example_scalar) == getattr(psa, op)(example_scalar)).all()
+        assert_series_equal_pandas(getattr(sa, op)(example_scalar), getattr(psa, op)(example_scalar))
 
         # Collection
         sa = lt.Series(example_dict_a)
-        assert (getattr(sa, op)(example_values) == getattr(psa, op)(np.array(example_values))).all()
+        assert_series_equal_pandas(getattr(sa, op)(example_values), getattr(psa, op)(np.array(example_values)))
         # Pandads is deprecating logical ops for dtype-less sequqences (eg: list, tuple)
 
     @pytest.mark.parametrize(
@@ -599,7 +592,7 @@ class TestSeriesOperators:
         psb = pd.Series(example_dict_b)
         getattr(sa, iop)(sb)
         getattr(psa, iop)(psb)
-        assert (sa == psa).all()
+        assert_series_equal_pandas(sa, psa)
 
     @pytest.mark.parametrize(
         ("iop", "op"),
@@ -626,22 +619,22 @@ class TestSeriesUnaryOperators:
         values = [-1, 0, 1]
         s = lt.Series(values)
         ps = pd.Series(values)
-        assert (-s == -ps).all()
+        assert_series_equal_pandas(-s, -ps)
 
     def test_pos(self):
         values = [-1, 0, 1]
         s = lt.Series(values)
         ps = pd.Series(values)
-        assert (+s == +ps).all()
+        assert_series_equal_pandas(+s, +ps)
 
     def test_abs(self):
         values = [-1, 0, 1]
         s = lt.Series(values)
         ps = pd.Series(values)
-        assert (abs(s) == abs(ps)).all()
+        assert_series_equal_pandas(abs(s), abs(ps))
 
     def test_invert(self):
         values = [-1, 0, 1]
         s = lt.Series(values)
         ps = pd.Series(values)
-        assert (~s == ~ps).all()
+        assert_series_equal_pandas(~s, ~ps)
