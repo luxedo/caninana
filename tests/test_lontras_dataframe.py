@@ -22,7 +22,6 @@ example_index = ["d", "e", "f"]
 example_columns = [3, 4]
 example_array = [[0, 1], [3, 4], [6, 7]]
 example_collection_scalars = [0, 1, 2]
-# example_series = lt.Series([10, 11], index=example_index)
 example_dict_list = {"col_a": [1, 2, 3], "col_b": [4, 5, 6]}
 example_dict_series = {
     "col_a": lt.Series([1, 2, 3], index=example_index),
@@ -36,6 +35,7 @@ example_scalar = 3
 example_cmp_a = [0, 1, 3]
 example_cmp_b = [1, 2, 3]
 example_op_collection = [1, 2, 3, 4, 5]
+example_op_mapping = dict(enumerate(example_op_collection))
 example_op_a = [[-3, -1, 13, 1, 2], [10, 2, -1, -13, -4]]
 example_op_b = [[7, 2, -9, 1, 3], [-1, 20, -3, 12, 4]]
 example_unary = [[-3, -1, 0, 1, 2], [10, 2, -1, 0, -4]]
@@ -712,11 +712,11 @@ class TestDataFrameOperators:
     )
     def test_op(self, op):
         dfa = lt.DataFrame(example_op_a)
-        dfb = lt.DataFrame(example_op_b)
         pdfa = pd.DataFrame(example_op_a)
-        pdfb = pd.DataFrame(example_op_b)
 
         # DataFrame
+        dfb = lt.DataFrame(example_op_b)
+        pdfb = pd.DataFrame(example_op_b)
         assert_dataframe_equal_pandas(getattr(dfa, op)(dfb), getattr(pdfa, op)(pdfb))
         # Series
         assert_dataframe_equal_pandas(
@@ -726,6 +726,8 @@ class TestDataFrameOperators:
         assert_dataframe_equal_pandas(getattr(dfa, op)(example_scalar), getattr(pdfa, op)(example_scalar))
         # Collection
         assert_dataframe_equal_pandas(getattr(dfa, op)(example_op_collection), getattr(pdfa, op)(example_op_collection))
+        # Mapping
+        assert_dataframe_equal_pandas(getattr(dfa, op)(example_op_mapping), getattr(pdfa, op)(example_op_mapping))
 
     @pytest.mark.parametrize(
         "op",
@@ -762,14 +764,72 @@ class TestDataFrameOperators:
                 [[getattr(a, op)(example_op_collection[j]) for j, a in enumerate(row)] for row in example_op_a]
             )
         ).all(axis=None)
+        # Mapping
+        assert (
+            getattr(dfa, op)(example_op_mapping)
+            == lt.DataFrame(
+                [[getattr(a, op)(example_op_collection[j]) for j, a in enumerate(row)] for row in example_op_a]
+            )
+        ).all(axis=None)
 
-    # def test_matmul(self):
-    #     sa = lt.DataFrame(example_op_a)
-    #     sb = lt.DataFrame(example_op_b)
-    #     print(sa @ sb)
-    #     psa = pd.DataFrame(example_op_a)
-    #     psb = pd.DataFrame(example_op_b)
-    #     print(psa @ psb)
+    def test_matmul(self):
+        dfa = lt.DataFrame(example_op_a)
+        pdfa = pd.DataFrame(example_op_a)
+
+        # DataFrame
+        dfb = lt.DataFrame(example_op_b).T
+        pdfb = pd.DataFrame(example_op_b).T
+        assert_dataframe_equal_pandas(dfa @ dfb, pdfa @ pdfb)
+
+        # Series
+        sb = lt.Series(example_op_collection)
+        psb = pd.Series(example_op_collection)
+        assert_series_equal_pandas(dfa @ sb, pdfa @ psb)
+
+        # Collection
+        assert_series_equal_pandas(dfa @ example_op_collection, pdfa @ example_op_collection)
+
+    def test_rop_matmul(self):
+        dfa = lt.DataFrame(example_op_a)
+        pdfa = pd.DataFrame(example_op_a)
+
+        # Right hand operator
+        assert_series_equal_pandas(example_op_collection @ dfa.T, example_op_collection @ pdfa.T)
+
+    def test_misaligned_dataframe_matmul(self):
+        dfa = lt.DataFrame(example_op_a)
+        dfb = lt.DataFrame(example_op_b)
+        pdfa = pd.DataFrame(example_op_a)
+        pdfb = pd.DataFrame(example_op_a)
+        assert_exception(lambda: pdfa @ pdfb, lambda: dfa @ dfb, ValueError)
+
+    def test_misaligned_series_matmul(self):
+        dfa = lt.DataFrame(example_op_a)
+        sb = lt.Series([*example_op_collection, "Misalign"])
+        pdfa = pd.DataFrame(example_op_a)
+        psb = pd.Series([*example_op_collection, "Misalign"])
+        assert_exception(lambda: pdfa @ psb, lambda: dfa @ sb, ValueError)
+
+    def test_misaligned_collection_rmatmul(self):
+        dfa = lt.DataFrame(example_op_a)
+        cb = [*example_op_collection, "Misalign"]
+        pdfa = pd.DataFrame(example_op_a)
+        pcb = [*example_op_collection, "Misalign"]
+        assert_exception(lambda: pcb @ pdfa, lambda: cb @ dfa, ValueError)
+
+    def test_mislabeled_series_matmul(self):
+        dfa = lt.DataFrame(example_op_a)
+        sb = lt.Series(example_op_collection)
+        sb.index = [3, 4, 5, 6, 7]
+        pdfa = pd.DataFrame(example_op_a)
+        psb = pd.Series(example_op_collection)
+        psb.index = [3, 4, 5, 6, 7]
+        assert_exception(lambda: pdfa @ psb, lambda: dfa @ sb, ValueError)
+
+    def test_matmul_wrong_type_error(self):
+        dfa = lt.DataFrame(example_op_a)
+        with pytest.raises(TypeError, match="Dot product requires other to be a DataFrame or Series"):
+            dfa @ int
 
     @pytest.mark.parametrize(
         "op",
@@ -793,6 +853,8 @@ class TestDataFrameOperators:
         assert_dataframe_equal_pandas(getattr(dfa, op)(example_scalar), getattr(pdfa, op)(example_scalar))
         # Collection
         assert_dataframe_equal_pandas(getattr(dfa, op)(example_op_collection), getattr(pdfa, op)(example_op_collection))
+        # Mapping
+        assert_dataframe_equal_pandas(getattr(dfa, op)(example_op_mapping), getattr(pdfa, op)(example_op_mapping))
 
     @pytest.mark.parametrize(
         "op",
@@ -837,51 +899,202 @@ class TestDataFrameOperators:
                 ]
             )
         ).all(axis=None)
+        # Mapping
+        assert (
+            getattr(dfa, op)(example_op_mapping)
+            == lt.DataFrame(
+                [
+                    [getattr(abs(a), op)(abs(example_op_collection[j])) for j, a in enumerate(row)]
+                    for row in example_op_a
+                ]
+            )
+        ).all(axis=None)
 
+    @pytest.mark.parametrize(
+        "iop",
+        [
+            "__iadd__",
+            "__isub__",
+            "__imul__",
+            "__itruediv__",
+            "__ifloordiv__",
+            "__imod__",
+            "__iand__",
+            "__ixor__",
+            "__ior__",
+        ],
+    )
+    def test_iop(self, iop):
+        # DataFrame
+        dfa = lt.DataFrame(example_op_a)
+        dfb = lt.DataFrame(example_op_b)
+        pdfa = pd.DataFrame(example_op_a)
+        pdfb = pd.DataFrame(example_op_b)
+        getattr(dfa, iop)(dfb)
+        getattr(pdfa, iop)(pdfb)
+        assert_dataframe_equal_pandas(dfa, pdfa)
+        # Series
+        dfa = lt.DataFrame(example_op_a)
+        sb = lt.Series(example_op_collection)
+        pdfa = pd.DataFrame(example_op_a)
+        psb = pd.Series(example_op_collection)
+        getattr(dfa, iop)(sb)
+        getattr(pdfa, iop)(psb)
+        assert_dataframe_equal_pandas(dfa, pdfa)
+        # Scalar
+        dfa = lt.DataFrame(example_op_a)
+        pdfa = pd.DataFrame(example_op_a)
+        getattr(dfa, iop)(example_scalar)
+        getattr(pdfa, iop)(example_scalar)
+        assert_dataframe_equal_pandas(dfa, pdfa)
+        # Collection
+        dfa = lt.DataFrame(example_op_a)
+        pdfa = pd.DataFrame(example_op_a)
+        getattr(dfa, iop)(example_op_collection)
+        getattr(pdfa, iop)(example_op_collection)
+        assert_dataframe_equal_pandas(dfa, pdfa)
+        # Mapping
+        dfa = lt.DataFrame(example_op_a)
+        pdfa = pd.DataFrame(example_op_a)
+        getattr(dfa, iop)(example_op_mapping)
+        getattr(pdfa, iop)(example_op_mapping)
+        assert_dataframe_equal_pandas(dfa, pdfa)
 
-#     @pytest.mark.parametrize(
-#         "iop",
-#         [
-#             "__iadd__",
-#             "__isub__",
-#             "__imul__",
-#             # "__imatmul__",
-#             "__itruediv__",
-#             "__ifloordiv__",
-#             "__imod__",
-#             "__ipow__",
-#             "__iand__",
-#             "__ixor__",
-#             "__ior__",
-#         ],
-#     )
-#     def test_op_inplace(self, iop):
-#         sa = lt.DataFrame(example_list_dict_a)
-#         sb = lt.DataFrame(example_list_dict_b)
-#         psa = pd.DataFrame(example_list_dict_a)
-#         psb = pd.DataFrame(example_list_dict_b)
-#         getattr(sa, iop)(sb)
-#         getattr(psa, iop)(psb)
-#         assert (sa == psa).all()
+    @pytest.mark.parametrize(
+        "iop",
+        [
+            "__ipow__",
+        ],
+    )
+    def test_iop_positive(self, iop):
+        # DataFrame
+        dfa = lt.DataFrame(example_op_a).abs()
+        dfb = lt.DataFrame(example_op_b).abs()
+        pdfa = pd.DataFrame(example_op_a).abs()
+        pdfb = pd.DataFrame(example_op_b).abs()
+        getattr(dfa, iop)(dfb)
+        getattr(pdfa, iop)(pdfb)
+        assert_dataframe_equal_pandas(dfa, pdfa)
+        # Series
+        dfa = lt.DataFrame(example_op_a).abs()
+        sb = lt.Series(example_op_collection).abs()
+        pdfa = pd.DataFrame(example_op_a).abs()
+        psb = pd.Series(example_op_collection).abs()
+        getattr(dfa, iop)(sb)
+        getattr(pdfa, iop)(psb)
+        assert_dataframe_equal_pandas(dfa, pdfa)
+        # Scalar
+        dfa = lt.DataFrame(example_op_a).abs()
+        pdfa = pd.DataFrame(example_op_a).abs()
+        getattr(dfa, iop)(abs(example_scalar))
+        getattr(pdfa, iop)(abs(example_scalar))
+        assert_dataframe_equal_pandas(dfa, pdfa)
+        # Collection
+        dfa = lt.DataFrame(example_op_a).abs()
+        pdfa = pd.DataFrame(example_op_a).abs()
+        getattr(dfa, iop)(example_op_collection)
+        getattr(pdfa, iop)(example_op_collection)
+        assert_dataframe_equal_pandas(dfa, pdfa)
+        # Mapping
+        dfa = lt.DataFrame(example_op_a).abs()
+        pdfa = pd.DataFrame(example_op_a).abs()
+        getattr(dfa, iop)(example_op_mapping)
+        getattr(pdfa, iop)(example_op_mapping)
+        assert_dataframe_equal_pandas(dfa, pdfa)
 
-#     @pytest.mark.parametrize(
-#         ("iop", "op"),
-#         [
-#             ("__ilshift__", "__lshift__"),
-#             ("__irshift__", "__rshift__"),
-#         ],
-#     )
-#     def test_op_inplace_shift(self, iop, op):
-#         sa = lt.DataFrame(example_list_dict_a)
-#         sb = lt.DataFrame(example_list_dict_b)
-#         getattr(sa, iop)(sb)
-#         assert sa == {k: getattr(v, op)(example_list_dict_b[k]) for k, v in example_list_dict_a.items()}
+    @pytest.mark.parametrize(
+        ("iop", "op"),
+        [
+            ("__ilshift__", "__lshift__"),
+            ("__irshift__", "__rshift__"),
+        ],
+    )
+    def test_iop_shift(self, iop, op):
+        # DataFrame
+        dfa = lt.DataFrame(example_op_a).abs()
+        dfb = lt.DataFrame(example_op_b).abs()
+        getattr(dfa, iop)(dfb)
+        assert (
+            dfa
+            == lt.DataFrame(
+                [
+                    [getattr(abs(a), op)(abs(example_op_b[i][j])) for j, a in enumerate(row)]
+                    for i, row in enumerate(example_op_a)
+                ]
+            )
+        ).all(axis=None)
+        # Series
+        dfa = lt.DataFrame(example_op_a).abs()
+        s = lt.Series(example_op_collection)
+        getattr(dfa, iop)(s)
+        assert (
+            dfa == lt.DataFrame([[getattr(abs(a), op)(abs(s[j])) for j, a in enumerate(row)] for row in example_op_a])
+        ).all(axis=None)
+        # Scalar
+        dfa = lt.DataFrame(example_op_a).abs()
+        getattr(dfa, iop)(example_scalar)
+        assert (dfa == lt.DataFrame([[getattr(abs(a), op)(example_scalar) for a in row] for row in example_op_a])).all(
+            axis=None
+        )
+        # Collection
+        dfa = lt.DataFrame(example_op_a).abs()
+        getattr(dfa, iop)(example_op_collection)
+        assert (
+            dfa
+            == lt.DataFrame(
+                [
+                    [getattr(abs(a), op)(abs(example_op_collection[j])) for j, a in enumerate(row)]
+                    for row in example_op_a
+                ]
+            )
+        ).all(axis=None)
+        # Mapping
+        dfa = lt.DataFrame(example_op_a).abs()
+        getattr(dfa, iop)(example_op_mapping)
+        assert (
+            dfa
+            == lt.DataFrame(
+                [
+                    [getattr(abs(a), op)(abs(example_op_collection[j])) for j, a in enumerate(row)]
+                    for row in example_op_a
+                ]
+            )
+        ).all(axis=None)
 
-#     def test_different_length_op_error(self):
-#         sa = lt.DataFrame(example_list_dict_a)
-#         sb = lt.DataFrame(example_list_dict_b)[: len(example_list_dict_b) - 2]
-#         with pytest.raises(ValueError, match="Cannot operate"):
-#             sa + sb
+    def test_iop_matmul(self):
+        dfa = lt.DataFrame(example_op_a)
+        pdfa = pd.DataFrame(example_op_a)
+        dfb = lt.DataFrame(example_op_b).T
+        pdfb = pd.DataFrame(example_op_b).T
+        dfa @= dfb
+        pdfa @= pdfb
+        assert_dataframe_equal_pandas(dfa, pdfa)
+
+    def test_iop_empty_add_scalar(self):
+        df = lt.DataFrame()
+        df += 10
+        assert len(df) == 0
+
+    def test_iop_empty_add_empty_mapping(self):
+        df = lt.DataFrame()
+        df += {}
+        assert len(df) == 0
+
+    def test_misaligned_dataframe_iop_error(self):
+        dfa = lt.DataFrame(example_op_a)
+        dfb = lt.DataFrame([example_op_collection, *example_op_b])
+        with pytest.raises(ValueError, match="Can only compare identically-labeled"):
+            dfa -= dfb
+
+    def test_misaligned_series_iop_error(self):
+        dfa = lt.DataFrame(example_op_a)
+        with pytest.raises(ValueError, match="Operands are not aligned. Do"):
+            dfa += lt.Series([*example_op_collection, "No!"])
+
+    def test_different_length_iop_error(self):
+        dfa = lt.DataFrame(example_op_a).abs()
+        with pytest.raises(ValueError, match="Unable to coerce"):
+            dfa += [*example_op_collection, "No!"]
 
 
 class TestDataFrameUnaryOperators:

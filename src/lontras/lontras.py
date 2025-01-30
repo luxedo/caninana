@@ -8,7 +8,7 @@ import statistics
 from collections import UserDict
 from collections.abc import Callable, Collection, Generator, Hashable, Iterator, Mapping, Sequence
 from functools import reduce
-from typing import Any, Literal, TypeAlias, overload
+from typing import Any, Literal, Self, TypeAlias, TypeGuard, overload
 
 AxisRows = 0
 AxisCols = 1
@@ -16,6 +16,11 @@ Scalar: TypeAlias = int | float | complex | str | bool
 Index: TypeAlias = Sequence[Hashable]
 Axis: TypeAlias = Literal[0, 1]
 AxisOrNone: TypeAlias = Axis | None
+ArrayLike = Collection
+
+
+def is_not_dataframe(val: Collection) -> TypeGuard[ArrayLike]:
+    return not isinstance(val, DataFrame)
 
 
 class LocIndexer:
@@ -101,13 +106,13 @@ class Series(UserDict):
     # Initializer and general methods
     ###########################################################################
     def __init__(
-        self, data: Mapping | Collection | Scalar | None = None, index: Index | None = None, name: Hashable = None
+        self, data: Mapping | ArrayLike | Scalar | None = None, index: Index | None = None, name: Hashable = None
     ):
         """
         Initializes a Series object.
 
         Args:
-            data (Mapping | Collection | Scalar, optional): Data for the Series. Can be a dictionary, list, or scalar. Defaults to None.
+            data (Mapping | ArrayLike | Scalar, optional): Data for the Series. Can be a dictionary, list, or scalar. Defaults to None.
             index (Index, optional): Index for the Series. Defaults to None.
             name (Hashable, optional): Name to assign to the Series. Defaults to None.
 
@@ -122,7 +127,7 @@ class Series(UserDict):
             super().__init__(data)
         elif isinstance(data, Scalar):
             super().__init__({0: data})
-        elif isinstance(data, Collection):
+        elif isinstance(data, ArrayLike):
             if index is None:
                 index = range(len(data))
             elif len(data) != len(list(index)):
@@ -232,6 +237,10 @@ class Series(UserDict):
         """
         return list(self.data.values())
 
+    @property
+    def shape(self) -> tuple[int,]:
+        return (len(self.index),)
+
     ###########################################################################
     # Accessors
     ###########################################################################
@@ -311,13 +320,13 @@ class Series(UserDict):
     ###########################################################################
     # Auxiliary Functions
     ###########################################################################
-    def _other_as_series(self, other: Series | Scalar | Collection) -> Series:
+    def _other_as_series(self, other: Series | Scalar | ArrayLike) -> Series:
         """Converts other to a Series if it is not already. Used for operations."""
         if isinstance(other, Series):
             return other
         if isinstance(other, Scalar):
             return Series([other] * len(self), index=self.index)
-        if isinstance(other, Collection):
+        if isinstance(other, ArrayLike):
             return Series(other, index=self.index)
         return NotImplemented  # no cov
 
@@ -325,7 +334,7 @@ class Series(UserDict):
         """Checks if the index of other matches the index of self. Used for operations."""
         return self.index == other.index
 
-    def _other_as_series_matching(self, other: Series | Collection | Scalar) -> Series:
+    def _other_as_series_matching(self, other: Series | ArrayLike | Scalar) -> Series:
         """Converts and matches index of other to self. Used for operations."""
         other = self._other_as_series(other)
         if not self._match_index(other):
@@ -402,24 +411,21 @@ class Series(UserDict):
         """
         return self.map(abs)
 
-    def dot(self, other: Series | Collection | Scalar) -> Scalar:
+    def dot(self, other: Series | ArrayLike) -> Scalar:
         """
-        Performs dot product with another Series, Collection or Scalar.
+        Performs dot product with another Series, ArrayLike or Scalar.
 
-        If other is a Series or a Collection, performs the dot product between the two.
+        If other is a Series or a ArrayLike, performs the dot product between the two.
         If other is a Scalar, multiplies all elements of the Series by the scalar and returns the sum.
 
         Args:
-            other (Series | Collection | Scalar)
+            other (Series | ArrayLike | Scalar)
 
         Returns:
             Scalar: The dot product of the Series.
         """
         other = self._other_as_series_matching(other)
-        acc = 0
-        for key, value in self.items():
-            acc += other[key] * value
-        return acc
+        return sum(other[key] * value for key, value in self.items())
 
     def max(self) -> Scalar:
         """
@@ -546,7 +552,7 @@ class Series(UserDict):
         """
         return self.agg(statistics.mode)
 
-    def quantiles(self, *, n=4, method: Literal["exclusive", "inclusive"] = "exclusive") -> Collection[float]:
+    def quantiles(self, *, n=4, method: Literal["exclusive", "inclusive"] = "exclusive") -> ArrayLike[float]:
         """
         Divide data into n continuous intervals with equal probability. Returns a list of `n - 1`
         cut points separating the intervals.
@@ -602,14 +608,14 @@ class Series(UserDict):
     ###########################################################################
     # Comparisons
     ###########################################################################
-    def __lt__(self, other: Series | Collection | Scalar) -> Series:
+    def __lt__(self, other: Series | ArrayLike | Scalar) -> Series:
         """
         Element-wise less than comparison.
 
         Compares each value in the Series with the corresponding value in `other`.
 
         Args:
-            other (Series | Collection | Scalar): The other Series, Collection, or Scalar to compare with.
+            other (Series | ArrayLike | Scalar): The other Series, ArrayLike, or Scalar to compare with.
 
         Returns:
             Series: A Series of boolean values indicating the result of the comparison.
@@ -617,14 +623,14 @@ class Series(UserDict):
         other = self._other_as_series_matching(other)
         return Series({k: v < other[k] for k, v in self.items()})
 
-    def __le__(self, other: Series | Collection | Scalar) -> Series:
+    def __le__(self, other: Series | ArrayLike | Scalar) -> Series:
         """
         Element-wise less than or equal to comparison.
 
         Compares each value in the Series with the corresponding value in `other`.
 
         Args:
-            other (Series | Collection | Scalar): The other Series, Collection, or Scalar to compare with.
+            other (Series | ArrayLike | Scalar): The other Series, ArrayLike, or Scalar to compare with.
 
         Returns:
             Series: A Series of boolean values indicating the result of the comparison.
@@ -632,14 +638,14 @@ class Series(UserDict):
         other = self._other_as_series_matching(other)
         return Series({k: v <= other[k] for k, v in self.items()})
 
-    def __eq__(self, other: Series | Collection | Scalar) -> Series:  # type: ignore
+    def __eq__(self, other: Series | ArrayLike | Scalar) -> Series:  # type: ignore
         """
         Element-wise equality comparison.
 
         Compares each value in the Series with the corresponding value in `other`.
 
         Args:
-            other (Series | Collection | Scalar): The other Series, Collection, or Scalar to compare with.
+            other (Series | ArrayLike | Scalar): The other Series, ArrayLike, or Scalar to compare with.
 
         Returns:
             Series: A Series of boolean values indicating the result of the comparison.
@@ -647,14 +653,14 @@ class Series(UserDict):
         other = self._other_as_series_matching(other)
         return Series({k: v == other[k] for k, v in self.items()})
 
-    def __ne__(self, other: Series | Collection | Scalar) -> Series:  # type: ignore
+    def __ne__(self, other: Series | ArrayLike | Scalar) -> Series:  # type: ignore
         """
         Element-wise inequality comparison.
 
         Compares each value in the Series with the corresponding value in `other`.
 
         Args:
-            other (Series | Collection | Scalar): The other Series, Collection, or Scalar to compare with.
+            other (Series | ArrayLike | Scalar): The other Series, ArrayLike, or Scalar to compare with.
 
         Returns:
             Series: A Series of boolean values indicating the result of the comparison.
@@ -662,14 +668,14 @@ class Series(UserDict):
         other = self._other_as_series_matching(other)
         return Series({k: v != other[k] for k, v in self.items()})
 
-    def __gt__(self, other: Series | Collection | Scalar) -> Series:
+    def __gt__(self, other: Series | ArrayLike | Scalar) -> Series:
         """
         Element-wise greater than comparison.
 
         Compares each value in the Series with the corresponding value in `other`.
 
         Args:
-            other (Series | Collection | Scalar): The other Series, Collection, or Scalar to compare with.
+            other (Series | ArrayLike | Scalar): The other Series, ArrayLike, or Scalar to compare with.
 
         Returns:
             Series: A Series of boolean values indicating the result of the comparison.
@@ -677,14 +683,14 @@ class Series(UserDict):
         other = self._other_as_series_matching(other)
         return Series({k: v > other[k] for k, v in self.items()})
 
-    def __ge__(self, other: Series | Collection | Scalar) -> Series:
+    def __ge__(self, other: Series | ArrayLike | Scalar) -> Series:
         """
         Element-wise greater than or equal to comparison.
 
         Compares each value in the Series with the corresponding value in `other`.
 
         Args:
-            other (Series | Collection | Scalar): The other Series, Collection, or Scalar to compare with.
+            other (Series | ArrayLike | Scalar): The other Series, ArrayLike, or Scalar to compare with.
 
         Returns:
             Series: A Series of boolean values indicating the result of the comparison.
@@ -695,12 +701,12 @@ class Series(UserDict):
     ###########################################################################
     # Operators
     ###########################################################################
-    def __add__(self, other: Series | Collection | Scalar) -> Series:
+    def __add__(self, other: Series | ArrayLike | Scalar) -> Series:
         """
         Element-wise addition.
 
         Args:
-            other (Series | Collection | Scalar): The other Series, Collection, or Scalar to operate with.
+            other (Series | ArrayLike | Scalar): The other Series, ArrayLike, or Scalar to operate with.
 
         Returns:
             Series: A Series with the results of the operation.
@@ -708,12 +714,12 @@ class Series(UserDict):
         other = self._other_as_series_matching(other)
         return Series({k: v + other[k] for k, v in self.items()})
 
-    def __sub__(self, other: Series | Collection | Scalar) -> Series:
+    def __sub__(self, other: Series | ArrayLike | Scalar) -> Series:
         """
         Element-wise subtraction.
 
         Args:
-            other (Series | Collection | Scalar): The other Series, Collection, or Scalar to operate with.
+            other (Series | ArrayLike | Scalar): The other Series, ArrayLike, or Scalar to operate with.
 
         Returns:
             Series: A Series with the results of the operation.
@@ -721,12 +727,12 @@ class Series(UserDict):
         other = self._other_as_series_matching(other)
         return Series({k: v - other[k] for k, v in self.items()})
 
-    def __mul__(self, other: Series | Collection | Scalar) -> Series:
+    def __mul__(self, other: Series | ArrayLike | Scalar) -> Series:
         """
         Element-wise multiplication.
 
         Args:
-            other (Series | Collection | Scalar): The other Series, Collection, or Scalar to operate with.
+            other (Series | ArrayLike | Scalar): The other Series, ArrayLike, or Scalar to operate with.
 
         Returns:
             Series: A Series with the results of the operation.
@@ -734,27 +740,26 @@ class Series(UserDict):
         other = self._other_as_series_matching(other)
         return Series({k: v * other[k] for k, v in self.items()})
 
-    def __matmul__(self, other: Series | Collection | Scalar) -> Scalar:
+    def __matmul__(self, other: Series | ArrayLike) -> Scalar:
         """
-        Performs dot product with another Series, Collection or Scalar.
+        Performs dot product with another Series, ArrayLike or Scalar.
 
-        If other is a Series or a Collection, performs the dot product between the two.
-        If other is a Scalar, multiplies all elements of the Series by the scalar and returns the sum.
+        If other is a Series or a ArrayLike, performs the dot product between the two.
 
         Args:
-            other (Series | Collection | Scalar)
+            other (Series | ArrayLike)
 
         Returns:
             Scalar: The dot product of the Series.
         """
         return self.dot(other)
 
-    def __truediv__(self, other: Series | Collection | Scalar) -> Series:
+    def __truediv__(self, other: Series | ArrayLike | Scalar) -> Series:
         """
         Element-wise division.
 
         Args:
-            other (Series | Collection | Scalar): The other Series, Collection, or Scalar to operate with.
+            other (Series | ArrayLike | Scalar): The other Series, ArrayLike, or Scalar to operate with.
 
         Returns:
             Series: A Series with the results of the operation.
@@ -762,12 +767,12 @@ class Series(UserDict):
         other = self._other_as_series_matching(other)
         return Series({k: v / other[k] for k, v in self.items()})
 
-    def __floordiv__(self, other: Series | Collection | Scalar) -> Series:
+    def __floordiv__(self, other: Series | ArrayLike | Scalar) -> Series:
         """
         Element-wise floor division.
 
         Args:
-            other (Series | Collection | Scalar): The other Series, Collection, or Scalar to operate with.
+            other (Series | ArrayLike | Scalar): The other Series, ArrayLike, or Scalar to operate with.
 
         Returns:
             Series: A Series with the results of the operation.
@@ -775,12 +780,12 @@ class Series(UserDict):
         other = self._other_as_series_matching(other)
         return Series({k: v // other[k] for k, v in self.items()})
 
-    def __mod__(self, other: Series | Collection | Scalar) -> Series:
+    def __mod__(self, other: Series | ArrayLike | Scalar) -> Series:
         """
         Element-wise modulo.
 
         Args:
-            other (Series | Collection | Scalar): The other Series, Collection, or Scalar to operate with.
+            other (Series | ArrayLike | Scalar): The other Series, ArrayLike, or Scalar to operate with.
 
         Returns:
             Series: A Series with the results of the operation.
@@ -788,12 +793,12 @@ class Series(UserDict):
         other = self._other_as_series_matching(other)
         return Series({k: v % other[k] for k, v in self.items()})
 
-    def __divmod__(self, other: Series | Collection | Scalar) -> Series:
+    def __divmod__(self, other: Series | ArrayLike | Scalar) -> Series:
         """
         Element-wise divmod.
 
         Args:
-            other (Series | Collection | Scalar): The other Series, Collection, or Scalar to operate with.
+            other (Series | ArrayLike | Scalar): The other Series, ArrayLike, or Scalar to operate with.
 
         Returns:
             Series: A Series with the results of the operation.
@@ -801,12 +806,12 @@ class Series(UserDict):
         other = self._other_as_series_matching(other)
         return Series({k: divmod(v, other[k]) for k, v in self.items()})
 
-    def __pow__(self, other: Series | Collection | Scalar) -> Series:
+    def __pow__(self, other: Series | ArrayLike | Scalar) -> Series:
         """
         Element-wise exponentiation.
 
         Args:
-            other (Series | Collection | Scalar): The other Series, Collection, or Scalar to operate with.
+            other (Series | ArrayLike | Scalar): The other Series, ArrayLike, or Scalar to operate with.
 
         Returns:
             Series: A Series with the results of the operation.
@@ -814,12 +819,12 @@ class Series(UserDict):
         other = self._other_as_series_matching(other)
         return Series({k: pow(v, other[k]) for k, v in self.items()})
 
-    def __lshift__(self, other: Series | Collection | Scalar) -> Series:
+    def __lshift__(self, other: Series | ArrayLike | Scalar) -> Series:
         """
         Element-wise left bit shift.
 
         Args:
-            other (Series | Collection | Scalar): The other Series, Collection, or Scalar to operate with.
+            other (Series | ArrayLike | Scalar): The other Series, ArrayLike, or Scalar to operate with.
 
         Returns:
             Series: A Series with the results of the operation.
@@ -827,12 +832,12 @@ class Series(UserDict):
         other = self._other_as_series_matching(other)
         return Series({k: v << other[k] for k, v in self.items()})
 
-    def __rshift__(self, other: Series | Collection | Scalar) -> Series:
+    def __rshift__(self, other: Series | ArrayLike | Scalar) -> Series:
         """
         Element-wise right bit shift.
 
         Args:
-            other (Series | Collection | Scalar): The other Series, Collection, or Scalar to operate with.
+            other (Series | ArrayLike | Scalar): The other Series, ArrayLike, or Scalar to operate with.
 
         Returns:
             Series: A Series with the results of the operation.
@@ -840,12 +845,12 @@ class Series(UserDict):
         other = self._other_as_series_matching(other)
         return Series({k: v >> other[k] for k, v in self.items()})
 
-    def __and__(self, other: Series | Collection | Scalar) -> Series:
+    def __and__(self, other: Series | ArrayLike | Scalar) -> Series:
         """
         Element-wise AND.
 
         Args:
-            other (Series | Collection | Scalar): The other Series, Collection, or Scalar to operate with.
+            other (Series | ArrayLike | Scalar): The other Series, ArrayLike, or Scalar to operate with.
 
         Returns:
             Series: A Series with the results of the operation.
@@ -853,12 +858,12 @@ class Series(UserDict):
         other = self._other_as_series_matching(other)
         return Series({k: v & other[k] for k, v in self.items()})
 
-    def __xor__(self, other: Series | Collection | Scalar) -> Series:
+    def __xor__(self, other: Series | ArrayLike | Scalar) -> Series:
         """
         Element-wise XOR.
 
         Args:
-            other (Series | Collection | Scalar): The other Series, Collection, or Scalar to operate with.
+            other (Series | ArrayLike | Scalar): The other Series, ArrayLike, or Scalar to operate with.
 
         Returns:
             Series: A Series with the results of the operation.
@@ -866,12 +871,12 @@ class Series(UserDict):
         other = self._other_as_series_matching(other)
         return Series({k: v ^ other[k] for k, v in self.items()})
 
-    def __or__(self, other: Series | Collection | Scalar) -> Series:
+    def __or__(self, other: Series | ArrayLike | Scalar) -> Series:
         """
         Element-wise OR.
 
         Args:
-            other (Series | Collection | Scalar): The other Series, Collection, or Scalar to operate with.
+            other (Series | ArrayLike | Scalar): The other Series, ArrayLike, or Scalar to operate with.
 
         Returns:
             Series: A Series with the results of the operation.
@@ -882,125 +887,138 @@ class Series(UserDict):
     ###########################################################################
     # Right-hand Side Operators
     ###########################################################################
-    def __radd__(self, other: Series | Collection | Scalar) -> Series:
+    def __radd__(self, other: Series | ArrayLike | Scalar) -> Series:
         other = self._other_as_series_matching(other)
         return other + self
 
-    def __rsub__(self, other: Series | Collection | Scalar) -> Series:
+    def __rsub__(self, other: Series | ArrayLike | Scalar) -> Series:
         other = self._other_as_series_matching(other)
         return other - self
 
-    def __rmul__(self, other: Series | Collection | Scalar) -> Series:
+    def __rmul__(self, other: Series | ArrayLike | Scalar) -> Series:
         other = self._other_as_series_matching(other)
         return other * self
 
-    def __rtruediv__(self, other: Series | Collection | Scalar) -> Series:
+    def __rmatmul__(self, other: Series | ArrayLike) -> Scalar:
+        return self.dot(other)
+
+    def __rtruediv__(self, other: Series | ArrayLike | Scalar) -> Series:
         other = self._other_as_series_matching(other)
         return other / self
 
-    def __rfloordiv__(self, other: Series | Collection | Scalar) -> Series:
+    def __rfloordiv__(self, other: Series | ArrayLike | Scalar) -> Series:
         other = self._other_as_series_matching(other)
         return other // self
 
-    def __rmod__(self, other: Series | Collection | Scalar) -> Series:
+    def __rmod__(self, other: Series | ArrayLike | Scalar) -> Series:
         other = self._other_as_series_matching(other)
         return other % self
 
-    def __rdivmod__(self, other: Series | Collection | Scalar) -> Series:
+    def __rdivmod__(self, other: Series | ArrayLike | Scalar) -> Series:
         other = self._other_as_series_matching(other)
         return divmod(other, self)
 
-    def __rpow__(self, other: Series | Collection | Scalar) -> Series:
+    def __rpow__(self, other: Series | ArrayLike | Scalar) -> Series:
         other = self._other_as_series_matching(other)
         return pow(other, self)
 
-    def __rlshift__(self, other: Series | Collection | Scalar) -> Series:
+    def __rlshift__(self, other: Series | ArrayLike | Scalar) -> Series:
         other = self._other_as_series_matching(other)
         return other << self
 
-    def __rrshift__(self, other: Series | Collection | Scalar) -> Series:
+    def __rrshift__(self, other: Series | ArrayLike | Scalar) -> Series:
         other = self._other_as_series_matching(other)
         return other >> self
 
-    def __rand__(self, other: Series | Collection | Scalar) -> Series:
+    def __rand__(self, other: Series | ArrayLike | Scalar) -> Series:
         other = self._other_as_series_matching(other)
         return other & self
 
-    def __rxor__(self, other: Series | Collection | Scalar) -> Series:
+    def __rxor__(self, other: Series | ArrayLike | Scalar) -> Series:
         other = self._other_as_series_matching(other)
         return other ^ self
 
-    def __ror__(self, other: Series | Collection | Scalar) -> Series:
+    def __ror__(self, other: Series | ArrayLike | Scalar) -> Series:
         other = self._other_as_series_matching(other)
         return other | self
 
     ###########################################################################
     # In-place Operators
     ###########################################################################
-    def __iadd__(self, other: Series | Collection | Scalar):
+    def __iadd__(self, other: Series | ArrayLike | Scalar) -> Self:
         other = self._other_as_series_matching(other)
         for k in self:
             self[k] += other[k]
+        return self
 
-    def __isub__(self, other: Series | Collection | Scalar):
+    def __isub__(self, other: Series | ArrayLike | Scalar) -> Self:
         other = self._other_as_series_matching(other)
         for k in self:
             self[k] -= other[k]
+        return self
 
-    def __imul__(self, other: Series | Collection | Scalar):
+    def __imul__(self, other: Series | ArrayLike | Scalar) -> Self:
         other = self._other_as_series_matching(other)
         for k in self:
             self[k] *= other[k]
+        return self
 
-    def __imatmul__(self, other: Series | Collection | Scalar):
-        other = self._other_as_series_matching(other)
-        for k in self:
-            self[k] @= other[k]
+    def __imatmul__(self, other: Series | ArrayLike) -> Scalar:  # noqa: PYI034
+        return self.dot(other)
 
-    def __itruediv__(self, other: Series | Collection | Scalar):
+    def __itruediv__(self, other: Series | ArrayLike | Scalar) -> Self:
         other = self._other_as_series_matching(other)
         for k in self:
             self[k] /= other[k]
+        return self
 
-    def __ifloordiv__(self, other: Series | Collection | Scalar):
+    def __ifloordiv__(self, other: Series | ArrayLike | Scalar) -> Self:
         other = self._other_as_series_matching(other)
         for k in self:
             self[k] //= other[k]
+        return self
 
-    def __imod__(self, other: Series | Collection | Scalar):
+    def __imod__(self, other: Series | ArrayLike | Scalar) -> Self:
         other = self._other_as_series_matching(other)
         for k in self:
             self[k] %= other[k]
+        return self
 
-    def __ipow__(self, other: Series | Collection | Scalar):
+    def __ipow__(self, other: Series | ArrayLike | Scalar) -> Self:
         other = self._other_as_series_matching(other)
         for k in self:
             self[k] **= other[k]
+        return self
 
-    def __ilshift__(self, other: Series | Collection | Scalar):
+    def __ilshift__(self, other: Series | ArrayLike | Scalar) -> Self:
         other = self._other_as_series_matching(other)
         for k in self:
             self[k] <<= other[k]
+        return self
 
-    def __irshift__(self, other: Series | Collection | Scalar):
+    def __irshift__(self, other: Series | ArrayLike | Scalar) -> Self:
         other = self._other_as_series_matching(other)
         for k in self:
             self[k] >>= other[k]
+        return self
 
-    def __iand__(self, other: Series | Collection | Scalar):
+    def __iand__(self, other: Series | ArrayLike | Scalar) -> Self:
         other = self._other_as_series_matching(other)
         for k in self:
             self[k] &= other[k]
+        return self
 
-    def __ixor__(self, other: Series | Collection | Scalar):
+    def __ixor__(self, other: Series | ArrayLike | Scalar) -> Self:
         other = self._other_as_series_matching(other)
         for k in self:
             self[k] ^= other[k]
+        return self
 
-    def __ior__(self, other: Series | Collection | Scalar):  # type: ignore
+    def __ior__(self, other: Series | ArrayLike | Scalar) -> Self:  # type: ignore
         other = self._other_as_series_matching(other)
         for k in self:
             self[k] |= other[k]
+        return self
 
     ###########################################################################
     # Unary Operators
@@ -1032,11 +1050,11 @@ class DataFrame(UserDict):
     def __init__(
         self,
         data: Mapping[Hashable, Series]
-        | Mapping[Hashable, Collection[Scalar]]
-        | Collection[Series]
-        | Collection[Mapping[Hashable, Scalar]]
-        | Collection[Scalar]
-        | Collection[Collection[Scalar]]
+        | Mapping[Hashable, ArrayLike[Scalar]]
+        | ArrayLike[Series]
+        | ArrayLike[Mapping[Hashable, Scalar]]
+        | ArrayLike[Scalar]
+        | ArrayLike[ArrayLike[Scalar]]
         | Iterator
         | None = None,
         index: Index | None = None,
@@ -1046,7 +1064,7 @@ class DataFrame(UserDict):
         Initializes a DataFrame object.
 
         Args:
-            data (Mapping | Collection | Scalar, optional): Data for the Series. Can be a dictionary, list, or scalar. Defaults to None.
+            data (Mapping | ArrayLike | Scalar, optional): Data for the Series. Can be a dictionary, list, or scalar. Defaults to None.
             index (Index, optional): Index for the Series. Defaults to None.
             name (Hashable, optional): Name to assign to the Series. Defaults to None.
 
@@ -1058,17 +1076,17 @@ class DataFrame(UserDict):
         match data:
             case None:
                 self._init_empty(index, columns)
-            case Mapping() | Collection() if len(data) == 0:
+            case Mapping() | ArrayLike() if len(data) == 0:
                 self._init_empty(index, columns)
-            case Mapping() as m if all(isinstance(v, (Series, Collection)) for v in m.values()):
+            case Mapping() as m if all(isinstance(v, (Series, ArrayLike)) for v in m.values()):
                 self._init_mapping_of_series({col: Series(val) for col, val in data.items()}, index, columns)  # type: ignore
-            case Collection() as c if all(isinstance(v, Series) for v in c):
+            case ArrayLike() as c if all(isinstance(v, Series) for v in c):
                 self._init_collection_of_series(data, index, columns)  # type: ignore
-            case Collection() as c if all(isinstance(v, Mapping) for v in c):
+            case ArrayLike() as c if all(isinstance(v, Mapping) for v in c):
                 self._init_collection_of_series([Series(row) for row in data], index, columns)  # type: ignore
-            case Collection() as c if all(isinstance(v, Scalar) for v in c) and not isinstance(c, str):
+            case ArrayLike() as c if all(isinstance(v, Scalar) for v in c) and not isinstance(c, str):
                 self._init_mapping_of_series({0: Series(data)}, index, columns)
-            case Collection() as c if all(isinstance(v, Collection) for v in c) and not isinstance(c, str):
+            case ArrayLike() as c if all(isinstance(v, ArrayLike) for v in c) and not isinstance(c, str):
                 self._init_collection_of_series([Series(row) for row in data], index, columns)  # type: ignore
             case _:
                 msg = "DataFrame constructor not properly called!"
@@ -1102,7 +1120,7 @@ class DataFrame(UserDict):
         super().__init__({col: s.copy().rename(col).reindex(self.index) for col, s in zip(self.columns, data.values())})
 
     def _init_collection_of_series(
-        self, data: Collection[Series], index: Index | None = None, columns: Index | None = None
+        self, data: ArrayLike[Series], index: Index | None = None, columns: Index | None = None
     ):
         row0 = next(iter(data))
         src_columns = row0.index
@@ -1202,7 +1220,7 @@ class DataFrame(UserDict):
             case _:
                 return self.apply(method, axis)
 
-    def agg(self, method: Callable[[Collection[Any]], Any], axis: Axis = 0) -> Series:
+    def agg(self, method: Callable[[ArrayLike[Any]], Any], axis: Axis = 0) -> Series:
         match axis:
             case int(c) if c == AxisRows:
                 return Series({col: method(s.values) for col, s in self.items()})
@@ -1212,7 +1230,7 @@ class DataFrame(UserDict):
                 msg = f"No axis named {axis} for object type DataFrame"
                 raise ValueError(msg)
 
-    def _agg_with_none(self, method: Callable[[Collection[Any]], Any], axis: AxisOrNone = 0):
+    def _agg_with_none(self, method: Callable[[ArrayLike[Any]], Any], axis: AxisOrNone = 0):
         match axis:
             case None:
                 return method([item for sublist in self.to_list() for item in sublist])
@@ -1243,11 +1261,41 @@ class DataFrame(UserDict):
         """
         return self.map(new_type)
 
-    # def dot(self, other: Series | Collection | Scalar) -> DataFrame | Series:
-    #     """
-    #     @REDO
-    #     """
-    #     return 10
+    # @overload
+    # def dot(self, other: DataFrame) -> DataFrame: ...  # no cov
+    # @overload
+    # def dot(self, other: Series | ArrayLike) -> Series: ...  # no cov
+    def dot(self, other: DataFrame | Series | ArrayLike) -> DataFrame | Series:
+        """
+        Compute the matrix multiplication between the DataFrame and another DataFrame or Series.
+
+        Parameters:
+            other (DataFrame or Series): The other DataFrame or Series to multiply with.
+
+        Returns:
+            DataFrame or Series: The result of the matrix multiplication.
+
+        Raises:
+            ValueError: If the columns of the DataFrame do not match the index of the other DataFrame/Series.
+            TypeError: If the other object is not a DataFrame or Series.
+        """
+        not_aligned_msg = "matrices are not aligned"
+        if isinstance(other, DataFrame):
+            if list(self.columns) != list(other.index):
+                raise ValueError(not_aligned_msg)
+            data = [[s_a.dot(s_b) for s_b in other.data.values()] for s_a in self.T.data.values()]
+            return DataFrame(data, index=self.index, columns=other.columns)
+        if isinstance(other, ArrayLike):
+            if len(self.columns) != len(other):
+                raise ValueError(not_aligned_msg)
+            if not isinstance(other, Series):
+                other = Series(other, index=self.columns)
+            if list(self.columns) != list(other.index):
+                raise ValueError(not_aligned_msg)
+            data = [s_a.dot(other) for s_a in self.T.data.values()]
+            return Series(data, index=self.index, name=other.name)
+        msg = "Dot product requires other to be a DataFrame or Series."
+        raise TypeError(msg)
 
     def abs(self) -> DataFrame:
         """
@@ -1447,22 +1495,22 @@ class DataFrame(UserDict):
     ###########################################################################
     # Comparisons
     ###########################################################################
-    def op(
-        self, op: str, other: DataFrame | Series | Mapping | Collection | Scalar
+    def _op(
+        self, op: str, other: DataFrame | Series | Mapping | ArrayLike | Scalar
     ) -> DataFrame:  # @TODO: Implement axis
         match other:
             case DataFrame():
                 return self._op_dataframe(op, other)
             case Series():
                 return self._op_series(op, other)
-            case Collection() | Mapping() as c if len(c) == 0 and len(self) == 0:
+            case ArrayLike() | Mapping() as c if len(c) == 0 and len(self) == 0:
                 return DataFrame()
-            case Collection() | Mapping() as c if len(c) != len(self.columns):
+            case ArrayLike() | Mapping() as c if len(c) != len(self.columns):
                 msg = f"Unable to coerce to Series, length must be {len(self.columns)}: given {len(other)}"
                 raise ValueError(msg)
             case Mapping():
                 return self._op_series(op, Series(other))
-            case Collection() as c if not isinstance(c, str):
+            case ArrayLike() as c if not isinstance(c, str):
                 return self._op_series(op, Series(other, index=self.columns))
             # No 2d collection comparison. Will consider 2d inputs as a series of collections
             case _:  # Everithing else is a scalar then
@@ -1480,309 +1528,409 @@ class DataFrame(UserDict):
             raise ValueError(msg)
         return DataFrame({col: getattr(s, op)(other[col]) for col, s in self.items()})
 
-    def _op_scalar(self, op: str, other: Collection[Any] | Scalar) -> DataFrame:
+    def _op_scalar(self, op: str, other: ArrayLike[Any] | Scalar) -> DataFrame:
         return DataFrame({col: getattr(s, op)(other) for col, s in self.items()})
 
-    def __lt__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:  # type: ignore
+    def __lt__(self, other: DataFrame | Series | ArrayLike | Scalar) -> DataFrame:  # type: ignore
         """
         Element-wise less than comparison.
 
         Compares each value in the DataFrame with the corresponding value in `other`.
 
         Args:
-            other (DataFrame | Series | Collection | Scalar): The other DataFrame Series,
-                Collection, or Scalar to compare with.
+            other (DataFrame | Series | ArrayLike | Scalar): The other DataFrame Series,
+                ArrayLike, or Scalar to compare with.
 
         Returns:
             DataFrame: A DataFrame of boolean values indicating the result of the comparison.
         """
-        return self.op("__lt__", other)
+        return self._op("__lt__", other)
 
-    def __le__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:  # type: ignore
+    def __le__(self, other: DataFrame | Series | ArrayLike | Scalar) -> DataFrame:  # type: ignore
         """
         Element-wise less than or equal to comparison.
 
         Compares each value in the DataFrame with the corresponding value in `other`.
 
         Args:
-            other (DataFrame | Series | Collection | Scalar): The other DataFrame Series,
-                Collection, or Scalar to compare with.
+            other (DataFrame | Series | ArrayLike | Scalar): The other DataFrame Series,
+                ArrayLike, or Scalar to compare with.
 
         Returns:
             DataFrame: A DataFrame of boolean values indicating the result of the comparison.
         """
-        return self.op("__le__", other)
+        return self._op("__le__", other)
 
-    def __eq__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:  # type: ignore
+    def __eq__(self, other: DataFrame | Series | ArrayLike | Scalar) -> DataFrame:  # type: ignore
         """
         Element-wise equality comparison.
 
         Compares each value in the DataFrame with the corresponding value in `other`.
 
         Args:
-            other (DataFrame | Series | Collection | Scalar): The other DataFrame Series,
-                Collection, or Scalar to compare with.
+            other (DataFrame | Series | ArrayLike | Scalar): The other DataFrame Series,
+                ArrayLike, or Scalar to compare with.
 
         Returns:
             DataFrame: A DataFrame of boolean values indicating the result of the comparison.
         """
-        return self.op("__eq__", other)
+        return self._op("__eq__", other)
 
-    def __ne__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:  # type: ignore
+    def __ne__(self, other: DataFrame | Series | ArrayLike | Scalar) -> DataFrame:  # type: ignore
         """
         Element-wise inequality comparison.
 
         Compares each value in the DataFrame with the corresponding value in `other`.
 
         Args:
-            other (DataFrame | Series | Collection | Scalar): The other DataFrame Series,
-                Collection, or Scalar to compare with.
+            other (DataFrame | Series | ArrayLike | Scalar): The other DataFrame Series,
+                ArrayLike, or Scalar to compare with.
 
         Returns:
             DataFrame: A DataFrame of boolean values indicating the result of the comparison.
         """
-        return self.op("__ne__", other)
+        return self._op("__ne__", other)
 
-    def __gt__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:  # type: ignore
+    def __gt__(self, other: DataFrame | Series | ArrayLike | Scalar) -> DataFrame:  # type: ignore
         """
         Element-wise greater than comparison.
 
         Compares each value in the DataFrame with the corresponding value in `other`.
 
         Args:
-            other (DataFrame | Series | Collection | Scalar): The other DataFrame Series,
-                Collection, or Scalar to compare with.
+            other (DataFrame | Series | ArrayLike | Scalar): The other DataFrame Series,
+                ArrayLike, or Scalar to compare with.
 
         Returns:
             DataFrame: A DataFrame of boolean values indicating the result of the comparison.
         """
-        return self.op("__gt__", other)
+        return self._op("__gt__", other)
 
-    def __ge__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:  # type: ignore
+    def __ge__(self, other: DataFrame | Series | ArrayLike | Scalar) -> DataFrame:  # type: ignore
         """
         Element-wise greater than or equal to comparison.
 
         Compares each value in the DataFrame with the corresponding value in `other`.
 
         Args:
-            other (DataFrame | Series | Collection | Scalar): The other DataFrame Series,
-                Collection, or Scalar to compare with.
+            other (DataFrame | Series | ArrayLike | Scalar): The other DataFrame Series,
+                ArrayLike, or Scalar to compare with.
 
         Returns:
             DataFrame: A DataFrame of boolean values indicating the result of the comparison.
         """
-        return self.op("__ge__", other)
+        return self._op("__ge__", other)
 
     ###########################################################################
     # Operators
     ###########################################################################
-    def __add__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:
+    def __add__(self, other: DataFrame | Series | ArrayLike | Scalar) -> DataFrame:
         """
         Element-wise addition.
 
         Args:
-            other (DataFrame | Series | Collection | Scalar): The other DataFrame, Series, Collection, or Scalar to operate with.
+            other (DataFrame | Series | ArrayLike | Scalar): The other DataFrame, Series, ArrayLike, or Scalar to operate with.
 
         Returns:
             DataFrame: A DataFrame with the results of the operation.
         """
-        return self.op("__add__", other)
+        return self._op("__add__", other)
 
-    def __sub__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:
+    def __sub__(self, other: DataFrame | Series | ArrayLike | Scalar) -> DataFrame:
         """
         Element-wise subtraction.
 
         Args:
-            other (DataFrame | Series | Collection | Scalar): The other DataFrame, Series, Collection, or Scalar to operate with.
+            other (DataFrame | Series | ArrayLike | Scalar): The other DataFrame, Series, ArrayLike, or Scalar to operate with.
 
         Returns:
             DataFrame: A DataFrame with the results of the operation.
         """
-        return self.op("__sub__", other)
+        return self._op("__sub__", other)
 
-    def __mul__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:
+    def __mul__(self, other: DataFrame | Series | ArrayLike | Scalar) -> DataFrame:
         """
         Element-wise multiplication.
 
         Args:
-            other (DataFrame | Series | Collection | Scalar): The other DataFrame, Series, Collection, or Scalar to operate with.
+            other (DataFrame | Series | ArrayLike | Scalar): The other DataFrame, Series, ArrayLike, or Scalar to operate with.
 
         Returns:
             DataFrame: A DataFrame with the results of the operation.
         """
-        return self.op("__mul__", other)
+        return self._op("__mul__", other)
 
-    # def __matmul__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame | Series:
-    #     """
-    #     @REDO!
-    #     """
-    #     return self.dot(other)
+    def __matmul__(self, other: DataFrame | Series | ArrayLike) -> DataFrame | Series:
+        """
+        Performs dot product with another Series, ArrayLike or Scalar.
 
-    def __truediv__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:
+        If other is a Series or a ArrayLike, performs the dot product between the two.
+        If other is a Scalar, multiplies all elements of the Series by the scalar and returns the sum.
+
+        Args:
+            other (Series | ArrayLike | Scalar)
+
+        Returns:
+            Scalar: The dot product of the Series.
+        """
+        return self.dot(other)
+
+    def __truediv__(self, other: DataFrame | Series | ArrayLike | Scalar) -> DataFrame:
         """
         Element-wise division.
 
         Args:
-            other (DataFrame | Series | Collection | Scalar): The other DataFrame, Series, Collection, or Scalar to operate with.
+            other (DataFrame | Series | ArrayLike | Scalar): The other DataFrame, Series, ArrayLike, or Scalar to operate with.
 
         Returns:
             DataFrame: A DataFrame with the results of the operation.
         """
-        return self.op("__truediv__", other)
+        return self._op("__truediv__", other)
 
-    def __floordiv__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:
+    def __floordiv__(self, other: DataFrame | Series | ArrayLike | Scalar) -> DataFrame:
         """
         Element-wise floor division.
 
         Args:
-            other (DataFrame | Series | Collection | Scalar): The other DataFrame, Series, Collection, or Scalar to operate with.
+            other (DataFrame | Series | ArrayLike | Scalar): The other DataFrame, Series, ArrayLike, or Scalar to operate with.
 
         Returns:
             DataFrame: A DataFrame with the results of the operation.
         """
-        return self.op("__floordiv__", other)
+        return self._op("__floordiv__", other)
 
-    def __mod__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:
+    def __mod__(self, other: DataFrame | Series | ArrayLike | Scalar) -> DataFrame:
         """
         Element-wise modulo.
 
         Args:
-            other (DataFrame | Series | Collection | Scalar): The other DataFrame, Series, Collection, or Scalar to operate with.
+            other (DataFrame | Series | ArrayLike | Scalar): The other DataFrame, Series, ArrayLike, or Scalar to operate with.
 
         Returns:
             DataFrame: A DataFrame with the results of the operation.
         """
-        return self.op("__mod__", other)
+        return self._op("__mod__", other)
 
-    def __divmod__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:
+    def __divmod__(self, other: DataFrame | Series | ArrayLike | Scalar) -> DataFrame:
         """
         Element-wise divmod.
 
         Args:
-            other (DataFrame | Series | Collection | Scalar): The other DataFrame, Series, Collection, or Scalar to operate with.
+            other (DataFrame | Series | ArrayLike | Scalar): The other DataFrame, Series, ArrayLike, or Scalar to operate with.
 
         Returns:
             DataFrame: A DataFrame with the results of the operation.
         """
-        return self.op("__divmod__", other)
+        return self._op("__divmod__", other)
 
-    def __pow__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:
+    def __pow__(self, other: DataFrame | Series | ArrayLike | Scalar) -> DataFrame:
         """
         Element-wise exponentiation.
 
         Args:
-            other (DataFrame | Series | Collection | Scalar): The other DataFrame, Series, Collection, or Scalar to operate with.
+            other (DataFrame | Series | ArrayLike | Scalar): The other DataFrame, Series, ArrayLike, or Scalar to operate with.
 
         Returns:
             DataFrame: A DataFrame with the results of the operation.
         """
-        return self.op("__pow__", other)
+        return self._op("__pow__", other)
 
-    def __lshift__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:
+    def __lshift__(self, other: DataFrame | Series | ArrayLike | Scalar) -> DataFrame:
         """
         Element-wise left bit shift.
 
         Args:
-            other (DataFrame | Series | Collection | Scalar): The other DataFrame, Series, Collection, or Scalar to operate with.
+            other (DataFrame | Series | ArrayLike | Scalar): The other DataFrame, Series, ArrayLike, or Scalar to operate with.
 
         Returns:
             DataFrame: A DataFrame with the results of the operation.
         """
-        return self.op("__lshift__", other)
+        return self._op("__lshift__", other)
 
-    def __rshift__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:
+    def __rshift__(self, other: DataFrame | Series | ArrayLike | Scalar) -> DataFrame:
         """
         Element-wise right bit shift.
 
         Args:
-            other (DataFrame | Series | Collection | Scalar): The other DataFrame, Series, Collection, or Scalar to operate with.
+            other (DataFrame | Series | ArrayLike | Scalar): The other DataFrame, Series, ArrayLike, or Scalar to operate with.
 
         Returns:
             DataFrame: A DataFrame with the results of the operation.
         """
-        return self.op("__rshift__", other)
+        return self._op("__rshift__", other)
 
-    def __and__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:
+    def __and__(self, other: DataFrame | Series | ArrayLike | Scalar) -> DataFrame:
         """
         Element-wise AND.
 
         Args:
-            other (DataFrame | Series | Collection | Scalar): The other DataFrame, Series, Collection, or Scalar to operate with.
+            other (DataFrame | Series | ArrayLike | Scalar): The other DataFrame, Series, ArrayLike, or Scalar to operate with.
 
         Returns:
             DataFrame: A DataFrame with the results of the operation.
         """
-        return self.op("__and__", other)
+        return self._op("__and__", other)
 
-    def __xor__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:
+    def __xor__(self, other: DataFrame | Series | ArrayLike | Scalar) -> DataFrame:
         """
         Element-wise XOR.
 
         Args:
-            other (DataFrame | Series | Collection | Scalar): The other DataFrame, Series, Collection, or Scalar to operate with.
+            other (DataFrame | Series | ArrayLike | Scalar): The other DataFrame, Series, ArrayLike, or Scalar to operate with.
 
         Returns:
             DataFrame: A DataFrame with the results of the operation.
         """
-        return self.op("__xor__", other)
+        return self._op("__xor__", other)
 
-    def __or__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:
+    def __or__(self, other: DataFrame | Series | ArrayLike | Scalar) -> DataFrame:
         """
         Element-wise OR.
 
         Args:
-            other (DataFrame | Series | Collection | Scalar): The other DataFrame, Series, Collection, or Scalar to operate with.
+            other (DataFrame | Series | ArrayLike | Scalar): The other DataFrame, Series, ArrayLike, or Scalar to operate with.
 
         Returns:
             DataFrame: A DataFrame with the results of the operation.
         """
-        return self.op("__or__", other)
+        return self._op("__or__", other)
 
     ###########################################################################
     # Right-hand Side Operators
     ###########################################################################
-    def __radd__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:
-        return self.op("__radd__", other)
+    def __radd__(self, other: DataFrame | Series | ArrayLike | Scalar) -> DataFrame:
+        return self._op("__radd__", other)
 
-    def __rsub__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:
-        return self.op("__rsub__", other)
+    def __rsub__(self, other: DataFrame | Series | ArrayLike | Scalar) -> DataFrame:
+        return self._op("__rsub__", other)
 
-    def __rmul__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:
-        return self.op("__rmul__", other)
+    def __rmul__(self, other: DataFrame | Series | ArrayLike | Scalar) -> DataFrame:
+        return self._op("__rmul__", other)
 
-    def __rtruediv__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:
-        return self.op("__rtruediv__", other)
+    def __rmatmul__(self, other: ArrayLike) -> Series:
+        if len(self.index) != len(other):
+            msg = f"shapes {Series(other).shape} and {self.shape} not aligned"
+            raise ValueError(msg)
+        other = Series(other, index=self.index)
+        data = [other.dot(s_a) for s_a in self.data.values()]
+        return Series(data, index=self.columns, name=other.name)
 
-    def __rfloordiv__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:
-        return self.op("__rfloordiv__", other)
+    def __rtruediv__(self, other: DataFrame | Series | ArrayLike | Scalar) -> DataFrame:
+        return self._op("__rtruediv__", other)
 
-    def __rmod__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:
-        return self.op("__rmod__", other)
+    def __rfloordiv__(self, other: DataFrame | Series | ArrayLike | Scalar) -> DataFrame:
+        return self._op("__rfloordiv__", other)
 
-    def __rdivmod__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:
-        return self.op("__rdivmod__", other)
+    def __rmod__(self, other: DataFrame | Series | ArrayLike | Scalar) -> DataFrame:
+        return self._op("__rmod__", other)
 
-    def __rpow__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:
-        return self.op("__rpow__", other)
+    def __rdivmod__(self, other: DataFrame | Series | ArrayLike | Scalar) -> DataFrame:
+        return self._op("__rdivmod__", other)
 
-    def __rlshift__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:
-        return self.op("__rlshift__", other)
+    def __rpow__(self, other: DataFrame | Series | ArrayLike | Scalar) -> DataFrame:
+        return self._op("__rpow__", other)
 
-    def __rrshift__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:
-        return self.op("__rrshift__", other)
+    def __rlshift__(self, other: DataFrame | Series | ArrayLike | Scalar) -> DataFrame:
+        return self._op("__rlshift__", other)
 
-    def __rand__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:
-        return self.op("__rand__", other)
+    def __rrshift__(self, other: DataFrame | Series | ArrayLike | Scalar) -> DataFrame:
+        return self._op("__rrshift__", other)
 
-    def __rxor__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:
-        return self.op("__rxor__", other)
+    def __rand__(self, other: DataFrame | Series | ArrayLike | Scalar) -> DataFrame:
+        return self._op("__rand__", other)
 
-    def __ror__(self, other: DataFrame | Series | Collection | Scalar) -> DataFrame:
-        return self.op("__ror__", other)
+    def __rxor__(self, other: DataFrame | Series | ArrayLike | Scalar) -> DataFrame:
+        return self._op("__rxor__", other)
+
+    def __ror__(self, other: DataFrame | Series | ArrayLike | Scalar) -> DataFrame:
+        return self._op("__ror__", other)
 
     ###########################################################################
     # In-place Operators
     ###########################################################################
+    def _iop(self, op: str, other: DataFrame | Series | Mapping | ArrayLike | Scalar) -> Self:
+        match other:
+            case DataFrame():
+                return self._iop_dataframe(op, other)
+            case Series():
+                return self._iop_series(op, other)
+            case ArrayLike() | Mapping() as c if len(c) == 0 and len(self) == 0:
+                return self
+            case ArrayLike() | Mapping() as c if len(c) != len(self.columns):
+                msg = f"Unable to coerce to Series, length must be {len(self.columns)}: given {len(other)}"
+                raise ValueError(msg)
+            case Mapping():
+                return self._iop_series(op, Series(other))
+            case ArrayLike() as c if not isinstance(c, str):
+                return self._iop_series(op, Series(other, index=self.columns))
+            # No 2d collection comparison. Will consider 2d inputs as a series of collections
+            case _:  # Everithing else is a scalar then
+                return self._iop_scalar(op, other)
+
+    def _iop_series(self, op: str, other: Series) -> Self:
+        if len(self.columns) != len(other):
+            msg = "Operands are not aligned. Do `left, right = left.align(right, axis=1, copy=False)` before operating."
+            raise ValueError(msg)
+        for col, s in self.data.items():
+            getattr(s, op)(other[col])
+        return self
+
+    def _iop_dataframe(self, op: str, other: DataFrame) -> Self:
+        if set(self.keys()) != set(other.keys()) or self.shape != other.shape:
+            msg = "Can only compare identically-labeled (both index and columns) DataFrame objects"
+            raise ValueError(msg)
+        for col, s in self.data.items():
+            getattr(s, op)(other[col])
+        return self
+
+    def _iop_scalar(self, op: str, other: ArrayLike[Any] | Scalar) -> Self:
+        for s in self.data.values():
+            getattr(s, op)(other)
+        return self
+
+    def __iadd__(self, other: DataFrame | Series | ArrayLike | Scalar) -> Self:
+        return self._iop("__iadd__", other)
+
+    def __isub__(self, other: DataFrame | Series | ArrayLike | Scalar) -> Self:
+        return self._iop("__isub__", other)
+
+    def __imul__(self, other: DataFrame | Series | ArrayLike | Scalar) -> Self:
+        return self._iop("__imul__", other)
+
+    # @TODO: How to overload correctly __matmul__ and __imatmul__?
+    # @overload
+    # def __imatmul__(self, other: DataFrame) -> DataFrame: ...  # no cov
+    # @overload
+    # def __imatmul__(self, other: Series | ArrayLike) -> Series: ...  # no cov
+    def __imatmul__(self, other: DataFrame | Series | ArrayLike) -> DataFrame | Series:  # noqa: PYI034
+        return self.dot(other)
+
+    def __itruediv__(self, other: DataFrame | Series | ArrayLike | Scalar) -> Self:
+        return self._iop("__itruediv__", other)
+
+    def __ifloordiv__(self, other: DataFrame | Series | ArrayLike | Scalar) -> Self:
+        return self._iop("__ifloordiv__", other)
+
+    def __imod__(self, other: DataFrame | Series | ArrayLike | Scalar) -> Self:
+        return self._iop("__imod__", other)
+
+    def __ipow__(self, other: DataFrame | Series | ArrayLike | Scalar) -> Self:
+        return self._iop("__ipow__", other)
+
+    def __ilshift__(self, other: DataFrame | Series | ArrayLike | Scalar) -> Self:
+        return self._iop("__ilshift__", other)
+
+    def __irshift__(self, other: DataFrame | Series | ArrayLike | Scalar) -> Self:
+        return self._iop("__irshift__", other)
+
+    def __iand__(self, other: DataFrame | Series | ArrayLike | Scalar) -> Self:
+        return self._iop("__iand__", other)
+
+    def __ixor__(self, other: DataFrame | Series | ArrayLike | Scalar) -> Self:
+        return self._iop("__ixor__", other)
+
+    def __ior__(self, other: DataFrame | Series | ArrayLike | Scalar) -> Self:  # type: ignore
+        return self._iop("__ior__", other)
 
     ###########################################################################
     # Unary Operators

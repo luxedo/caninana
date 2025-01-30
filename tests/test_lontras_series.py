@@ -146,6 +146,10 @@ class TestSeriesInit:
         with pytest.raises(ValueError, match="Length mismatch"):
             s.index = [*list(example_index), "more_indexes"]
 
+    def test_shape(self):
+        s = lt.Series(example_dict)
+        assert s.shape == (len(example_dict),)
+
 
 class TestSeriesAccessors:
     def test_getitem_0(self):
@@ -511,9 +515,11 @@ class TestSeriesOperators:
         psb = pd.Series(example_dict_b)
 
         # Series
-        assert (sa @ sb) == (psa @ psb)
+        assert ((sa @ sb) == int(psa @ psb)) is True
         # Collection
-        assert (sa @ example_values) == (psa @ example_values)
+        assert ((sa @ example_values) == int(psa @ example_values)) is True
+        # Right hand operator
+        assert ((example_values @ sa) == int(example_values @ psa)) is True
 
     @pytest.mark.parametrize(
         "op",
@@ -578,7 +584,6 @@ class TestSeriesOperators:
             "__iadd__",
             "__isub__",
             "__imul__",
-            # "__imatmul__",
             "__itruediv__",
             "__ifloordiv__",
             "__imod__",
@@ -610,11 +615,22 @@ class TestSeriesOperators:
         getattr(sa, iop)(sb)
         assert sa == {k: getattr(v, op)(example_dict_b[k]) for k, v in example_dict_a.items()}
 
+    def test_iop_matmul(self):
+        sa = lt.Series(example_dict_a)
+        sb = lt.Series(example_dict_b)
+        sa @= sb
+        assert sa == np.dot(list(example_dict_a.values()), list(example_dict_b.values()))
+
     def test_different_length_op_error(self):
         sa = lt.Series(example_dict_a)
         sb = lt.Series(example_dict_b)[: len(example_dict_b) - 2]
         with pytest.raises(ValueError, match="Cannot operate"):
             sa + sb
+
+    def test_iop_empty(self):
+        df = lt.Series()
+        df += 10
+        assert len(df) == 0
 
 
 class TestSeriesUnaryOperators:
