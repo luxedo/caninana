@@ -1,6 +1,5 @@
-# Lontras
-
-<img src="https://raw.githubusercontent.com/luxedo/lontras/refs/heads/main/docs/_static/lontra.png" height=400 alt="Lontras Logo"/>
+![Lontras Logo](https://raw.githubusercontent.com/luxedo/lontras/refs/heads/main/docs/_static/lontras_logo.png#gh-light-mode-only)
+![Lontras Logo](https://raw.githubusercontent.com/luxedo/lontras/refs/heads/main/docs/_static/lontras_logo_white.png#gh-dark-mode-only)
 
 [![PyPI - Version](https://img.shields.io/pypi/v/lontras.svg)](https://pypi.org/project/lontras)
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/lontras.svg)](https://pypi.org/project/lontras)
