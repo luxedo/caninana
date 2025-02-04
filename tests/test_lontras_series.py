@@ -152,7 +152,7 @@ class TestSeriesInit:
 
 
 class TestSeriesAccessors:
-    def test_getitem_0(self):
+    def test_getitem_scalar(self):
         s = lt.Series(example_dict)
         ps = pd.Series(example_dict)
         key = "a"
@@ -162,31 +162,41 @@ class TestSeriesAccessors:
         key = "c"
         assert s[key] == ps[key]
 
-    def test_getitem_1(self):
+    def test_getitem_collection(self):
         s = lt.Series(example_dict)
         ps = pd.Series(example_dict)
         indexes = ["a", "c"]
-        assert (s[indexes] == ps[indexes]).all()
+        assert_series_equal_pandas(s[indexes], ps[indexes])
 
-    def test_getitem_2(self):
+    def test_getitem_slice(self):
         s = lt.Series(example_dict)
         ps = pd.Series(example_dict)
         indexes = slice(0, 2)
-        assert (s[indexes] == ps[indexes]).all()
+        assert_series_equal_pandas(s[indexes], ps[indexes])
 
-    def test_getitem_3(self):
+    def test_getitem_slice_notation(self):
+        s = lt.Series(example_dict)
+        ps = pd.Series(example_dict)
+        assert_series_equal_pandas(s[0:1], ps[0:1])
+
+    def test_getitem_slice_too_many_indexers(self):
+        s = lt.Series(example_dict)
+        ps = pd.Series(example_dict)
+        assert_exception(lambda: ps[0, 1], lambda: s[0, 1], KeyError, match=".*")
+
+    def test_getitem_mask(self):
         s = lt.Series(example_dict)
         ps = pd.Series(example_dict)
         val = 2
         mask_s = s > val
         mask_ps = ps > val
-        assert (s[mask_s] == ps[mask_ps]).all()
+        assert_series_equal_pandas(s[mask_s], ps[mask_ps])
 
-    def test_getitem_4(self):
+    def test_getitem_series(self):
         s = lt.Series(example_dict)
         ps = pd.Series(example_dict)
         indexes = lt.Series(example_index[:2])
-        assert (s[indexes] == ps[indexes]).all()
+        assert_series_equal_pandas(s[indexes], ps[indexes])
 
     def test_loc_getitem_scalar(self):
         s = lt.Series(example_dict)
@@ -211,7 +221,7 @@ class TestSeriesAccessors:
         s = lt.Series(example_dict)
         ps = pd.Series(example_dict)
         keys = ["a", "b"]
-        assert (s.loc[keys] == ps.loc[keys]).all()
+        assert_series_equal_pandas(s.loc[keys], ps.loc[keys])
 
     def test_loc_setitem_list(self):
         s = lt.Series(example_dict)
@@ -220,7 +230,16 @@ class TestSeriesAccessors:
         value = 4
         s.loc[keys] = value
         ps.loc[keys] = value
-        assert (s.loc[keys] == ps.loc[keys]).all()
+        assert_series_equal_pandas(s.loc[keys], ps.loc[keys])
+
+    def test_loc_setitem_list_and_collection_value(self):
+        s = lt.Series(example_dict)
+        ps = pd.Series(example_dict)
+        keys = ["a", "b"]
+        value = [40, 50]
+        s.loc[keys] = value
+        ps.loc[keys] = value
+        assert_series_equal_pandas(s.loc[keys], ps.loc[keys])
 
     def test_loc_get_not_hashable_key(self):
         s = lt.Series(example_dict)
@@ -255,7 +274,7 @@ class TestSeriesAccessors:
         s = lt.Series(example_dict)
         ps = pd.Series(example_dict)
         indexes = slice(0, 2, 1)
-        assert (s.iloc[indexes] == ps.iloc[indexes]).all()
+        assert_series_equal_pandas(s.iloc[indexes], ps.iloc[indexes])
 
     def test_iloc_setitem_slice(self):
         s = lt.Series(example_dict)
@@ -264,13 +283,13 @@ class TestSeriesAccessors:
         value = 4
         s.iloc[indexes] = value
         ps.iloc[indexes] = value
-        assert (s.iloc[indexes] == ps.iloc[indexes]).all()
+        assert_series_equal_pandas(s.iloc[indexes], ps.iloc[indexes])
 
     def test_iloc_getitem_list(self):
         s = lt.Series(example_dict)
         ps = pd.Series(example_dict)
         indexes = [0, 1]
-        assert (s.iloc[indexes] == ps.iloc[indexes]).all()
+        assert_series_equal_pandas(s.iloc[indexes], ps.iloc[indexes])
 
     def test_iloc_setitem_list(self):
         s = lt.Series(example_dict)
@@ -279,33 +298,38 @@ class TestSeriesAccessors:
         value = 4
         s.iloc[indexes] = value
         ps.iloc[indexes] = value
-        assert (s.iloc[indexes] == ps.iloc[indexes]).all()
+        assert_series_equal_pandas(s.iloc[indexes], ps.iloc[indexes])
+
+    def test_iloc_setitem_list_and_collection_value(self):
+        s = lt.Series(example_dict)
+        ps = pd.Series(example_dict)
+        indexes = [0, 1]
+        value = [31, 32]
+        s.iloc[indexes] = value
+        ps.iloc[indexes] = value
+        assert_series_equal_pandas(s.iloc[indexes], ps.iloc[indexes])
 
     def test_iloc_get_error(self):
         s = lt.Series(example_dict)
-        with pytest.raises(TypeError, match="Cannot index"):
+        with pytest.raises(TypeError, match="Passing .* as an indexer is not supported"):
             s.iloc[{1, 2, 3}]
 
     def test_loc_set_error(self):
         s = lt.Series(example_dict)
         with pytest.raises(TypeError, match="Cannot index"):
-            s.iloc[{1, 2, 3}] = "no!"
+            s.loc[{1, 2, 3}] = "no!"
 
     def test_head(self):
         s = lt.Series(example_dict)
         ps = pd.Series(example_dict)
         n = 2
-        assert len(s.head(n)) == n
-        assert (s.head(n) == example_values[:n]).all()
-        assert (s.head(n) == ps.head(n)).all()
+        assert_series_equal_pandas(s.head(n), ps.head(n))
 
     def test_tail(self):
         s = lt.Series(example_dict)
         ps = pd.Series(example_dict)
         n = 2
-        assert len(s.tail(n)) == n
-        assert (s.tail(n) == example_values[-n:]).all()
-        assert (s.tail(n) == ps.tail(n)).all()
+        assert_series_equal_pandas(s.tail(n), ps.tail(n))
 
     def test_find(self):
         s = lt.Series(example_dict)

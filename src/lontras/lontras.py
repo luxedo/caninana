@@ -6,85 +6,187 @@ from __future__ import annotations
 import copy
 import statistics
 from collections import UserDict
-from collections.abc import Callable, Collection, Generator, Hashable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Collection, Generator, Iterator, Mapping, Sequence
 from functools import reduce
-from typing import Any, Literal, Self, TypeAlias, TypeGuard, overload
+from typing import Any, Generic, Literal, Self, TypeAlias, TypeGuard, TypeVar, Union, overload
 
 AxisRows = 0
 AxisCols = 1
-Scalar: TypeAlias = int | float | complex | str | bool
-Index: TypeAlias = Sequence[Hashable]
 Axis: TypeAlias = Literal[0, 1]
 AxisOrNone: TypeAlias = Axis | None
+Scalar: TypeAlias = int | float | complex | str | bool
+Index: TypeAlias = Sequence[Scalar]
 ArrayLike = Collection
+LocIndexes: TypeAlias = Union[Scalar, list[Scalar], slice, "Series"]
+IlocIndexes: TypeAlias = Union[int, list[int], slice, "Series"]
+LocDataFrameReturn: TypeAlias = Union["DataFrame", "Series", Scalar]
+LocSeriesReturn: TypeAlias = Union["Series", Scalar]
+ReturnType = TypeVar("ReturnType", "Series", "DataFrame", Scalar)
+T = TypeVar("T", "Series", "DataFrame")
 
 
-def is_not_dataframe(val: Collection) -> TypeGuard[ArrayLike]:
-    return not isinstance(val, DataFrame)
+def _is_array_like(value) -> TypeGuard[ArrayLike]:
+    return isinstance(value, Collection) and not isinstance(value, DataFrame)
 
 
-class LocIndexer:
-    def __init__(self, series: Series):
-        self.series = series
+def _is_scalar(value: Any) -> TypeGuard[Scalar]:
+    return isinstance(value, (int, float, complex, str, bool))
 
-    def __getitem__(self, key: Hashable | list[Hashable] | Series) -> Any:
-        if isinstance(key, list):
-            return Series({k: self.series[k] for k in key})
-        if isinstance(key, Series):
-            if self._is_boolean_mask(key):
-                return Series({k: v for k, v in self.series.items() if key[k]})
-            return Series({k: self.series[k] for k in key.values})
-        if isinstance(key, Hashable):
-            return self.series[key]
-        msg = f"Cannot index with unhashable: {key=}"
-        raise TypeError(msg)
 
-    def __setitem__(self, key: Hashable | list[Hashable], value: Any) -> Any:
-        if isinstance(key, list):
-            for k in key:
-                self.series[k] = value
-            return
-        if isinstance(key, Hashable):
-            self.series[key] = value
-            return
-        msg = f"Cannot index with unhashable: {key=}"
-        raise TypeError(msg)
+class BaseScalar(Generic[T]):
+    data: T
+
+    def __init__(self, data: T):
+        self.data = data
 
     def _is_boolean_mask(self, s: Series) -> bool:
-        return self.series._match_index(s) and s.map(lambda v: isinstance(v, bool)).all()  # noqa: SLF001
+        return self.data.index == s.index and s.map(lambda v: isinstance(v, bool)).all()
 
-
-class IlocIndexer:
-    def __init__(self, series: Series):
-        self.series = series
-        self.index = list(series.index)
-
-    def __getitem__(self, index: int | slice | list[int]) -> Any:
-        if isinstance(index, int):
-            return self.series[self.index[index]]
-        if isinstance(index, slice):
-            label_index = self.index[index]
-            return Series({k: self.series[k] for k in label_index})
-        if isinstance(index, list):
-            label_index = [self.index[i] for i in index]
-            return Series({k: self.series[k] for k in label_index})
-        msg = f"Cannot index with: {index=}"
+    def _index_to_labels(self, index: IlocIndexes) -> Scalar | list[Scalar]:
+        match index:
+            case int():
+                return self.data.index[index]
+            case slice():
+                return list(self.data.index[index])
+            case list():
+                return [self.data.index[i] for i in index]
+            case Series():
+                if self._is_boolean_mask(index):
+                    return [self.data.index[i] for i in index if index is True]
+                return [self.data.index[i] for i in index]
+        msg = f"Passing {type(index)} as an indexer is not supported. Use list instead"
         raise TypeError(msg)
 
-    def __setitem__(self, index: int | slice | list[int], value: Any) -> Any:
-        if isinstance(index, int):
-            self.series[self.index[index]] = value
-            return
-        if isinstance(index, slice):
-            for k in self.index[index]:
-                self.series[k] = value
-            return
-        if isinstance(index, list):
-            for i in index:
-                self.series[self.index[i]] = value
-            return
-        msg = f"Cannot index with: {index=}"
+
+class LocSeriesIndexer(BaseScalar["Series"]):
+    def __getitem__(self, label: LocIndexes) -> Scalar | Series:
+        match label:
+            case list():
+                return Series({k: self.data[k] for k in label}, name=self.data.name)
+            case slice():
+                return Series({k: self.data[k] for k in self.data.index[label]}, name=self.data.name)
+            case Series():
+                if self._is_boolean_mask(label):
+                    return Series({k: v for k, v in self.data.items() if label[k]}, name=self.data.name)
+                return Series({k: self.data[k] for k in label.values}, name=self.data.name)
+            case _ if _is_scalar(label):
+                return self.data[label]
+        msg = f"Cannot index with unhashable: {label=}"
         raise TypeError(msg)
+
+    def __setitem__(self, label: LocIndexes, value: Scalar | ArrayLike):
+        if isinstance(label, list):
+            if _is_array_like(value):
+                if len(label) != len(value):
+                    msg = "cannot set using a list-like indexer with a different length than the valuel"
+                    raise ValueError(msg)
+                for k, v in zip(label, value):
+                    self.data[k] = v
+            else:
+                for k in label:
+                    self.data[k] = value
+            return
+        if isinstance(label, Scalar):
+            self.data[label] = value
+            return
+        msg = f"Cannot index with unhashable: {label=}"
+        raise TypeError(msg)
+
+
+class IlocSeriesIndexer(BaseScalar["Series"]):
+    @overload
+    def __getitem__(self, index: int) -> Scalar: ...
+    @overload
+    def __getitem__(self, index: list[int] | slice | Series) -> Series: ...
+    def __getitem__(self, index: IlocIndexes) -> Scalar | Series:
+        return self.data.loc.__getitem__(self._index_to_labels(index))
+
+    def __setitem__(self, index: IlocIndexes, value: Scalar | ArrayLike):
+        self.data.loc.__setitem__(self._index_to_labels(index), value)
+        # return super().__setitem__(self._index_to_labels(index), value)
+
+
+class LocDataFrameIndexer(BaseScalar["DataFrame"]):
+    def _select_columns(self, col_labels: LocIndexes) -> DataFrame | Series:
+        match col_labels:
+            case list():
+                return DataFrame({k: self.data[k] for k in col_labels}, columns=col_labels)
+            case slice():
+                columns = self.data.columns[col_labels]
+                return DataFrame({k: self.data[k] for k in columns}, columns=columns)
+            case Series():
+                columns = col_labels.values
+                return DataFrame({k: self.data[k] for k in columns}, columns=columns)
+            case _ if _is_scalar(col_labels):
+                return self.data[col_labels]
+        msg = "nooo"
+        raise ValueError(msg)
+
+    def _columns_to_labels(self, index: int | slice | list[int] | Series) -> Scalar | list[Scalar]:
+        match index:
+            case int():
+                return self.data.columns[index]
+            case slice():
+                return list(self.data.columns[index])
+            case list():
+                return [self.data.columns[i] for i in index]
+            case Series():
+                if self._is_boolean_mask(index):
+                    return [self.data.columns[i] for i in index if index is True]
+                return [self.data.columns[i] for i in index]
+        msg = f"Passing {type(index)} as an indexer is not supported. Use list instead"
+        raise TypeError(msg)
+
+    @overload
+    def __getitem__(self, label: tuple[Scalar, Scalar]) -> Scalar: ...
+    @overload
+    def __getitem__(self, label: Scalar | tuple[Scalar, Any] | tuple[Any, Scalar]) -> Series: ...
+    @overload
+    def __getitem__(self, label: Any) -> DataFrame: ...
+    def __getitem__(self, label: LocIndexes | tuple[LocIndexes, LocIndexes]) -> LocDataFrameReturn:
+        match label:
+            case (row_labels, col_labels) if isinstance(label, tuple):
+                data = self._select_columns(col_labels)
+                return data.loc[row_labels]
+            case list() | slice() | Series():
+                return DataFrame({col: self.data[col].loc[label] for col in self.data.columns})
+            case _ if _is_scalar(label):
+                return Series(
+                    {col: self.data[col][label] for col in self.data.columns}, index=self.data.columns, name=label
+                )
+            case _:
+                msg = f"Cannot index with unhashable: {label=}"
+                raise TypeError(msg)
+
+    def __setitem__(self, label: LocIndexes, value: Scalar | Mapping | DataFrame):
+        pass
+
+
+class IlocDataFrameIndexer(BaseScalar["DataFrame"]):
+    @overload
+    def __getitem__(self, index: tuple[int, int]) -> Scalar: ...
+    @overload
+    def __getitem__(self, index: int | tuple[int, Any] | tuple[Any, int]) -> Series: ...
+    @overload
+    def __getitem__(self, index: Any) -> DataFrame: ...
+    def __getitem__(self, index: IlocIndexes | tuple[IlocIndexes, IlocIndexes]) -> LocDataFrameReturn:
+        match index:
+            case (row_indexes, col_indexes) if isinstance(index, tuple):
+                return self.data.loc.__getitem__(
+                    (self._index_to_labels(row_indexes), self.data.loc._columns_to_labels(col_indexes))  # noqa: SLF001
+                )
+            case _:
+                return self.data.loc.__getitem__(self._index_to_labels(index))  # type: ignore
+
+    def __setitem__(self, index: IlocIndexes, value: Scalar | Mapping | DataFrame):
+        match index:
+            case (row_indexes, col_indexes) if isinstance(index, tuple):
+                return self.data.loc.__setitem__(
+                    (self._index_to_labels(row_indexes), self.data.locdata.loc._columns_to_labels(col_indexes)),  # noqa: SLF001
+                    value,
+                )
+            case _:
+                return self.data.loc.__setitem__(self._index_to_labels(index), value)
 
 
 class Series(UserDict):
@@ -92,21 +194,19 @@ class Series(UserDict):
     Series class representing a one-dimensional labeled array with capabilities for data analysis.
 
     Attributes:
-        name (Hashable): Name of the Series.
-        loc_indexer (LocIndexer): Indexer for label-based location selection.
-        iloc_indexer (ilocIndexer): Indexer for integer-based location selection.
+        name (Scalar): Name of the Series.
     """
 
-    name: Hashable
-    loc_indexer: LocIndexer
-    iloc_indexer: IlocIndexer
-    __slots__ = ("name", "loc_indexer", "iloc_indexer")
+    name: Scalar | None
+    loc: LocSeriesIndexer
+    iloc: IlocSeriesIndexer
+    __slots__ = ("name", "loc", "iloc")
 
     ###########################################################################
     # Initializer and general methods
     ###########################################################################
     def __init__(
-        self, data: Mapping | ArrayLike | Scalar | None = None, index: Index | None = None, name: Hashable = None
+        self, data: Mapping | ArrayLike | Scalar | None = None, index: Index | None = None, name: Scalar | None = None
     ):
         """
         Initializes a Series object.
@@ -114,7 +214,7 @@ class Series(UserDict):
         Args:
             data (Mapping | ArrayLike | Scalar, optional): Data for the Series. Can be a dictionary, list, or scalar. Defaults to None.
             index (Index, optional): Index for the Series. Defaults to None.
-            name (Hashable, optional): Name to assign to the Series. Defaults to None.
+            name (Scalar, optional): Name to assign to the Series. Defaults to None.
 
         Raises:
             ValueError: If the length of data and index don't match, or if data type is unexpected.
@@ -141,8 +241,8 @@ class Series(UserDict):
         self._set_indexers()
 
     def _set_indexers(self):
-        self.iloc = IlocIndexer(self)
-        self.loc = LocIndexer(self)
+        self.loc = LocSeriesIndexer(self)
+        self.iloc = IlocSeriesIndexer(self)
 
     def __repr__(self) -> str:
         if len(self) == 0:
@@ -170,12 +270,12 @@ class Series(UserDict):
         clone._set_indexers()  # noqa: SLF001
         return clone
 
-    def rename(self, name: Hashable) -> Series:
+    def rename(self, name: Scalar) -> Series:
         """
         Renames the Series.
 
         Args:
-            name (Hashable): The new name for the Series.
+            name (Scalar): The new name for the Series.
 
         Returns:
             Series: A new Series with the updated name (a copy).
@@ -244,12 +344,12 @@ class Series(UserDict):
     ###########################################################################
     # Accessors
     ###########################################################################
-    def __getitem__(self, name: Hashable | list[Hashable] | slice | Series) -> Any | Series:
+    def __getitem__(self, name: Scalar | list[Scalar] | slice | Series) -> Any | Series:
         """
         Retrieves an item or slice from the Series.
 
         Args:
-            name (Hashable | list[Hashable] | slice): The key, list of keys, or slice to retrieve.
+            name (Scalar | list[Scalar] | slice): The key, list of keys, or slice to retrieve.
 
         Returns:
             Any: The value(s) associated with the given key(s) or slice.
@@ -301,7 +401,7 @@ class Series(UserDict):
                 return i
         return None
 
-    def find(self, val: Any) -> Hashable | None:
+    def find(self, val: Any) -> Scalar | None:
         """
         Finds the first label (key) associated with a given value in the Series.
 
@@ -309,7 +409,7 @@ class Series(UserDict):
             val (Any): The value to search for.
 
         Returns:
-            Hashable | None: The label (key) of the first occurrence of the value,
+            Scalar | None: The label (key) of the first occurrence of the value,
                              or None if the value is not found.
         """
         for k, v in self.items():
@@ -325,19 +425,15 @@ class Series(UserDict):
         if isinstance(other, Series):
             return other
         if isinstance(other, Scalar):
-            return Series([other] * len(self), index=self.index)
+            return Series([other] * len(self), index=self.index, name=self.name)
         if isinstance(other, ArrayLike):
-            return Series(other, index=self.index)
+            return Series(other, index=self.index, name=self.name)
         return NotImplemented  # no cov
-
-    def _match_index(self, other: Series) -> bool:
-        """Checks if the index of other matches the index of self. Used for operations."""
-        return self.index == other.index
 
     def _other_as_series_matching(self, other: Series | ArrayLike | Scalar) -> Series:
         """Converts and matches index of other to self. Used for operations."""
         other = self._other_as_series(other)
-        if not self._match_index(other):
+        if self.index != other.index:
             msg = "Cannot operate in Series with different index"
             raise ValueError(msg)
         return other
@@ -496,24 +592,24 @@ class Series(UserDict):
             raise ValueError(msg)
         return self.ifind(self.min())  # type: ignore
 
-    def idxmax(self) -> Hashable | None:
+    def idxmax(self) -> Scalar | None:
         """
         Returns the label of the maximum value.
 
         Returns:
-            Hashable: The label of the maximum value.
+            Scalar: The label of the maximum value.
         """
         if len(self) == 0:
             msg = "Attempt to get ixmax of an empty sequence"
             raise ValueError(msg)
         return self.find(self.max())
 
-    def idxmin(self) -> Hashable | None:
+    def idxmin(self) -> Scalar | None:
         """
         Returns the label of the minimum value.
 
         Returns:
-            Hashable: The label of the minimum value.
+            Scalar: The label of the minimum value.
         """
         if len(self) == 0:
             msg = "Attempt to get idxmin of an empty sequence"
@@ -596,12 +692,12 @@ class Series(UserDict):
         """
         return self.values
 
-    def to_dict(self) -> dict[Hashable, Any]:
+    def to_dict(self) -> dict[Scalar, Any]:
         """
         Converts the Series to a dictionary.
 
         Returns:
-            dict[Hashable, Any]: A dictionary representation of the Series.
+            dict[Scalar, Any]: A dictionary representation of the Series.
         """
         return dict(self)
 
@@ -621,7 +717,7 @@ class Series(UserDict):
             Series: A Series of boolean values indicating the result of the comparison.
         """
         other = self._other_as_series_matching(other)
-        return Series({k: v < other[k] for k, v in self.items()})
+        return Series({k: v < other[k] for k, v in self.items()}, name=self.name)
 
     def __le__(self, other: Series | ArrayLike | Scalar) -> Series:
         """
@@ -636,7 +732,7 @@ class Series(UserDict):
             Series: A Series of boolean values indicating the result of the comparison.
         """
         other = self._other_as_series_matching(other)
-        return Series({k: v <= other[k] for k, v in self.items()})
+        return Series({k: v <= other[k] for k, v in self.items()}, name=self.name)
 
     def __eq__(self, other: Series | ArrayLike | Scalar) -> Series:  # type: ignore
         """
@@ -651,7 +747,7 @@ class Series(UserDict):
             Series: A Series of boolean values indicating the result of the comparison.
         """
         other = self._other_as_series_matching(other)
-        return Series({k: v == other[k] for k, v in self.items()})
+        return Series({k: v == other[k] for k, v in self.items()}, name=self.name)
 
     def __ne__(self, other: Series | ArrayLike | Scalar) -> Series:  # type: ignore
         """
@@ -666,7 +762,7 @@ class Series(UserDict):
             Series: A Series of boolean values indicating the result of the comparison.
         """
         other = self._other_as_series_matching(other)
-        return Series({k: v != other[k] for k, v in self.items()})
+        return Series({k: v != other[k] for k, v in self.items()}, name=self.name)
 
     def __gt__(self, other: Series | ArrayLike | Scalar) -> Series:
         """
@@ -681,7 +777,7 @@ class Series(UserDict):
             Series: A Series of boolean values indicating the result of the comparison.
         """
         other = self._other_as_series_matching(other)
-        return Series({k: v > other[k] for k, v in self.items()})
+        return Series({k: v > other[k] for k, v in self.items()}, name=self.name)
 
     def __ge__(self, other: Series | ArrayLike | Scalar) -> Series:
         """
@@ -696,7 +792,7 @@ class Series(UserDict):
             Series: A Series of boolean values indicating the result of the comparison.
         """
         other = self._other_as_series_matching(other)
-        return Series({k: v >= other[k] for k, v in self.items()})
+        return Series({k: v >= other[k] for k, v in self.items()}, name=self.name)
 
     ###########################################################################
     # Operators
@@ -712,7 +808,7 @@ class Series(UserDict):
             Series: A Series with the results of the operation.
         """
         other = self._other_as_series_matching(other)
-        return Series({k: v + other[k] for k, v in self.items()})
+        return Series({k: v + other[k] for k, v in self.items()}, name=self.name)
 
     def __sub__(self, other: Series | ArrayLike | Scalar) -> Series:
         """
@@ -725,7 +821,7 @@ class Series(UserDict):
             Series: A Series with the results of the operation.
         """
         other = self._other_as_series_matching(other)
-        return Series({k: v - other[k] for k, v in self.items()})
+        return Series({k: v - other[k] for k, v in self.items()}, name=self.name)
 
     def __mul__(self, other: Series | ArrayLike | Scalar) -> Series:
         """
@@ -738,7 +834,7 @@ class Series(UserDict):
             Series: A Series with the results of the operation.
         """
         other = self._other_as_series_matching(other)
-        return Series({k: v * other[k] for k, v in self.items()})
+        return Series({k: v * other[k] for k, v in self.items()}, name=self.name)
 
     def __matmul__(self, other: Series | ArrayLike) -> Scalar:
         """
@@ -765,7 +861,7 @@ class Series(UserDict):
             Series: A Series with the results of the operation.
         """
         other = self._other_as_series_matching(other)
-        return Series({k: v / other[k] for k, v in self.items()})
+        return Series({k: v / other[k] for k, v in self.items()}, name=self.name)
 
     def __floordiv__(self, other: Series | ArrayLike | Scalar) -> Series:
         """
@@ -778,7 +874,7 @@ class Series(UserDict):
             Series: A Series with the results of the operation.
         """
         other = self._other_as_series_matching(other)
-        return Series({k: v // other[k] for k, v in self.items()})
+        return Series({k: v // other[k] for k, v in self.items()}, name=self.name)
 
     def __mod__(self, other: Series | ArrayLike | Scalar) -> Series:
         """
@@ -791,7 +887,7 @@ class Series(UserDict):
             Series: A Series with the results of the operation.
         """
         other = self._other_as_series_matching(other)
-        return Series({k: v % other[k] for k, v in self.items()})
+        return Series({k: v % other[k] for k, v in self.items()}, name=self.name)
 
     def __divmod__(self, other: Series | ArrayLike | Scalar) -> Series:
         """
@@ -804,7 +900,7 @@ class Series(UserDict):
             Series: A Series with the results of the operation.
         """
         other = self._other_as_series_matching(other)
-        return Series({k: divmod(v, other[k]) for k, v in self.items()})
+        return Series({k: divmod(v, other[k]) for k, v in self.items()}, name=self.name)
 
     def __pow__(self, other: Series | ArrayLike | Scalar) -> Series:
         """
@@ -817,7 +913,7 @@ class Series(UserDict):
             Series: A Series with the results of the operation.
         """
         other = self._other_as_series_matching(other)
-        return Series({k: pow(v, other[k]) for k, v in self.items()})
+        return Series({k: pow(v, other[k]) for k, v in self.items()}, name=self.name)
 
     def __lshift__(self, other: Series | ArrayLike | Scalar) -> Series:
         """
@@ -830,7 +926,7 @@ class Series(UserDict):
             Series: A Series with the results of the operation.
         """
         other = self._other_as_series_matching(other)
-        return Series({k: v << other[k] for k, v in self.items()})
+        return Series({k: v << other[k] for k, v in self.items()}, name=self.name)
 
     def __rshift__(self, other: Series | ArrayLike | Scalar) -> Series:
         """
@@ -843,7 +939,7 @@ class Series(UserDict):
             Series: A Series with the results of the operation.
         """
         other = self._other_as_series_matching(other)
-        return Series({k: v >> other[k] for k, v in self.items()})
+        return Series({k: v >> other[k] for k, v in self.items()}, name=self.name)
 
     def __and__(self, other: Series | ArrayLike | Scalar) -> Series:
         """
@@ -856,7 +952,7 @@ class Series(UserDict):
             Series: A Series with the results of the operation.
         """
         other = self._other_as_series_matching(other)
-        return Series({k: v & other[k] for k, v in self.items()})
+        return Series({k: v & other[k] for k, v in self.items()}, name=self.name)
 
     def __xor__(self, other: Series | ArrayLike | Scalar) -> Series:
         """
@@ -869,7 +965,7 @@ class Series(UserDict):
             Series: A Series with the results of the operation.
         """
         other = self._other_as_series_matching(other)
-        return Series({k: v ^ other[k] for k, v in self.items()})
+        return Series({k: v ^ other[k] for k, v in self.items()}, name=self.name)
 
     def __or__(self, other: Series | ArrayLike | Scalar) -> Series:
         """
@@ -882,7 +978,7 @@ class Series(UserDict):
             Series: A Series with the results of the operation.
         """
         other = self._other_as_series_matching(other)
-        return Series({k: v | other[k] for k, v in self.items()})
+        return Series({k: v | other[k] for k, v in self.items()}, name=self.name)
 
     ###########################################################################
     # Right-hand Side Operators
@@ -1037,22 +1133,30 @@ class Series(UserDict):
 
 
 class DataFrame(UserDict):
+    """
+    DataFrame class representing a two-dimensional, size-mutable, tabular data structure with
+    labeled axes (rows and columns).
+
+    Attributes:
+        index (Index): The row labels (index) of the DataFrame. Used for label-based row selection.
+        columns (Index): The column labels of the DataFrame. Used for label-based column selection.
+    """
+
     index: Index
     columns: Index
-    loc_indexer: LocIndexer
-    iloc_indexer: IlocIndexer
-    _length: int
-    __slots__ = ("name", "index", "loc_indexer", "iloc_indexer", "_length")
+    loc: LocDataFrameIndexer
+    iloc: IlocDataFrameIndexer
+    __slots__ = ("name", "index", "loc", "iloc")
 
     ###########################################################################
     # Initializer and general methods
     ###########################################################################
     def __init__(
         self,
-        data: Mapping[Hashable, Series]
-        | Mapping[Hashable, ArrayLike[Scalar]]
+        data: Mapping[Scalar, Series]
+        | Mapping[Scalar, ArrayLike[Scalar]]
         | ArrayLike[Series]
-        | ArrayLike[Mapping[Hashable, Scalar]]
+        | ArrayLike[Mapping[Scalar, Scalar]]
         | ArrayLike[Scalar]
         | ArrayLike[ArrayLike[Scalar]]
         | Iterator
@@ -1066,7 +1170,7 @@ class DataFrame(UserDict):
         Args:
             data (Mapping | ArrayLike | Scalar, optional): Data for the Series. Can be a dictionary, list, or scalar. Defaults to None.
             index (Index, optional): Index for the Series. Defaults to None.
-            name (Hashable, optional): Name to assign to the Series. Defaults to None.
+            name (Scalar, optional): Name to assign to the Series. Defaults to None.
 
         Raises:
             ValueError: If the length of data and index don't match, or if data type is unexpected.
@@ -1092,6 +1196,7 @@ class DataFrame(UserDict):
                 msg = "DataFrame constructor not properly called!"
                 raise ValueError(msg)
         self._validate_index_and_columns()
+        self._set_indexers()
 
     def _init_empty(self, index: Index | None = None, columns: Index | None = None):
         super().__init__()
@@ -1102,7 +1207,7 @@ class DataFrame(UserDict):
         self.columns = []
 
     def _init_mapping_of_series(
-        self, data: Mapping[Hashable, Series], index: Index | None = None, columns: Index | None = None
+        self, data: Mapping[Scalar, Series], index: Index | None = None, columns: Index | None = None
     ):
         col0 = next(iter(data))
         val0 = data[col0]
@@ -1162,6 +1267,10 @@ class DataFrame(UserDict):
                 msg = "Somehow the inner columns and DataFrame columns don't match. This shouldn't happen!"
                 raise ValueError(msg)
 
+    def _set_indexers(self):
+        self.iloc = IlocDataFrameIndexer(self)
+        self.loc = LocDataFrameIndexer(self)
+
     @property
     def shape(self) -> tuple[int, int]:
         return (len(self.index), len(self.columns))
@@ -1178,6 +1287,20 @@ class DataFrame(UserDict):
         ret = [[f"{col[i]!s:>{width}}" for col, width in zip(columns, widths)] for i in range(height)]
         return "\n".join("  ".join(r) for r in ret)
 
+    def copy(self, *, deep: bool = True) -> DataFrame:
+        """
+        Creates a copy of the DataFrame.
+
+        Args:
+            deep (bool, optional): If True, creates a deep copy. Otherwise, creates a shallow copy. Defaults to True.
+
+        Returns:
+            DataFrame: A copy of the DataFrame.
+        """
+        clone = copy.deepcopy(self) if deep else copy.copy(self)
+        clone._set_indexers()  # noqa: SLF001
+        return clone
+
     @property
     def T(self) -> DataFrame:  # noqa: N802
         data = list(self.data.values())
@@ -1193,12 +1316,57 @@ class DataFrame(UserDict):
         """
         return self.to_list()
 
-    def iterrows(self) -> Generator[tuple[Hashable, Series]]:
+    def iterrows(self) -> Generator[tuple[Scalar, Series]]:
         yield from self.T.items()
 
     ###########################################################################
     # Accessors
     ###########################################################################
+    @overload
+    def __getitem__(self, name: Scalar) -> Series: ...
+    @overload
+    def __getitem__(self, name: list[Scalar] | slice | Series) -> DataFrame: ...
+    def __getitem__(self, name: Scalar | list[Scalar] | slice | Series) -> LocDataFrameReturn:
+        """
+        Retrieves an item or slice from the DataFrame.
+
+        Args:
+            name (Scalar | list[Scalar] | slice): The key, list of keys, or slice to retrieve.
+
+        Returns:
+            Series | DataFRame: A new Series if a single column is selected or a DataFrame for multiple columns
+        """
+        if isinstance(name, (list, Series)):
+            if self.loc._is_boolean_mask(Series(name)):  # noqa: SLF001
+                return self.loc[name]
+            return self.loc[:, name]
+        if isinstance(name, slice):
+            return self.iloc[name]
+        return super().__getitem__(name)
+
+    def head(self, n: int = 5) -> DataFrame:
+        """
+        Returns the first n rows.
+
+        Args:
+            n (int, optional): Number of rows to return. Defaults to 5.
+
+        Returns:
+            DataFrame: A new DataFrame containing the first n rows.
+        """
+        return self.iloc[:n]
+
+    def tail(self, n: int = 5) -> DataFrame:
+        """
+        Returns the last n rows.
+
+        Args:
+            n (int, optional): Number of rows to return. Defaults to 5.
+
+        Returns:
+            DataFrame: A new DataFrame containing the last n rows.
+        """
+        return self.iloc[-n:]
 
     ###########################################################################
     # Apply/Agg/Map/Reduce
@@ -1463,13 +1631,13 @@ class DataFrame(UserDict):
         return list(self.apply(lambda s: s.values, axis=1).data.values())
 
     @overload
-    def to_dict(self) -> dict[Hashable, dict[Hashable, Any]]: ...  # no cov
+    def to_dict(self) -> dict[Scalar, dict[Scalar, Any]]: ...  # no cov
     @overload
-    def to_dict(self, orient: Literal["dict"]) -> dict[Hashable, dict[Hashable, Any]]: ...  # no cov
+    def to_dict(self, orient: Literal["dict"]) -> dict[Scalar, dict[Scalar, Any]]: ...  # no cov
     @overload
-    def to_dict(self, orient: Literal["list"]) -> dict[Hashable, list[Any]]: ...  # no cov
+    def to_dict(self, orient: Literal["list"]) -> dict[Scalar, list[Any]]: ...  # no cov
     @overload
-    def to_dict(self, orient: Literal["records"]) -> list[dict[Hashable, Any]]: ...  # no cov
+    def to_dict(self, orient: Literal["records"]) -> list[dict[Scalar, Any]]: ...  # no cov
     def to_dict(self, orient: Literal["dict", "list", "records"] = "dict"):
         """
         Converts the DataFrame to a dictionary.
@@ -1479,7 +1647,7 @@ class DataFrame(UserDict):
                 dictionary.
 
         Returns:
-            dict[Hashable, Any]: A dictionary representation of the Series.
+            dict[Scalar, Any]: A dictionary representation of the Series.
         """
         match orient:
             case "dict":

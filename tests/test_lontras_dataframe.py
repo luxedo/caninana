@@ -266,153 +266,181 @@ class TestDataFrameInit:
 #     assert (pdf.T == df.T).all(axis=None)
 
 
-# class TestDataFrameAccessors:
-#     def test_getitem_0(self):
-#         df = lt.DataFrame(example_list_dict)
-#         pdf = pd.DataFrame(example_list_dict)
-#         key = "a"
-#         assert s[key] == ps[key]
-#         key = "b"
-#         assert s[key] == ps[key]
-#         key = "c"
-#         assert s[key] == ps[key]
+class TestDataFrameAccessors:
+    def test_getitem_columns(self):
+        df = lt.DataFrame(example_list_dict)
+        pdf = pd.DataFrame(example_list_dict)
+        key = "a"
+        assert df[key] == pdf[key]
+        key = "b"
+        assert df[key] == pdf[key]
 
-#     def test_getitem_1(self):
-#         df = lt.DataFrame(example_list_dict)
-#         pdf = pd.DataFrame(example_list_dict)
-#         indexedf = ["a", "c"]
-#         assert (s[indexes] == ps[indexes]).all()
+    def test_getitem_missing_column(self):
+        df = lt.DataFrame(example_list_dict)
+        pdf = pd.DataFrame(example_list_dict)
+        key = "c"
+        assert_exception(lambda: pdf[key], lambda: df[key], KeyError)
 
-#     def test_getitem_2(self):
-#         df = lt.DataFrame(example_list_dict)
-#         pdf = pd.DataFrame(example_list_dict)
-#         indexedf = slice(0, 2)
-#         assert (s[indexes] == ps[indexes]).all()
+    def test_getitem_collection(self):
+        df = lt.DataFrame(example_list_dict)
+        pdf = pd.DataFrame(example_list_dict)
+        indexes = ["a", "b"]
+        assert_dataframe_equal_pandas(df[indexes], pdf[indexes])
 
-#     def test_getitem_3(self):
-#         df = lt.DataFrame(example_list_dict)
-#         pdf = pd.DataFrame(example_list_dict)
-#         val = 2
-#         mask_df = s > val
-#         mask_pdf = ps > val
-#         assert (s[mask_s] == ps[mask_ps]).all()
+    def test_getitem_slice(self):
+        df = lt.DataFrame(example_list_dict)
+        pdf = pd.DataFrame(example_list_dict)
+        indexes = slice(0, 1)
+        assert_dataframe_equal_pandas(df[indexes], pdf[indexes])
 
-#     def test_getitem_4(self):
-#         df = lt.DataFrame(example_list_dict)
-#         pdf = pd.DataFrame(example_list_dict)
-#         indexedf = lt.DataFrame(example_index[:2])
-#         assert (s[indexes] == ps[indexes]).all()
+    def test_getitem_slice_notation(self):
+        df = lt.DataFrame(example_list_dict)
+        pdf = pd.DataFrame(example_list_dict)
+        assert_dataframe_equal_pandas(df[0:1], pdf[0:1])
 
-#     def test_loc_getitem_scalar(self):
-#         df = lt.DataFrame(example_list_dict)
-#         pdf = pd.DataFrame(example_list_dict)
-#         key = "a"
-#         assert df.loc[key] == pdf.loc[key]
-#         key = "b"
-#         assert df.loc[key] == pdf.loc[key]
-#         key = "c"
-#         assert df.loc[key] == pdf.loc[key]
+    def test_getitem_slice_too_many_indexers(self):
+        df = lt.DataFrame(example_list_dict)
+        pdf = pd.DataFrame(example_list_dict)
+        assert_exception(lambda: pdf[0, 1, 2], lambda: df[0, 1, 2], KeyError)
 
-#     def test_loc_setitem_scalar(self):
-#         df = lt.DataFrame(example_list_dict)
-#         pdf = pd.DataFrame(example_list_dict)
-#         key = "a"
-#         value = 4
-#         df.loc[key] = value
-#         pdf.loc[key] = value
-#         assert df.loc[key] == ps[key]
+    def test_getitem_mask(self):
+        df = lt.DataFrame(example_list_dict)
+        pdf = pd.DataFrame(example_list_dict)
+        val = 2
+        mask_df = df["a"] > val
+        mask_pdf = pdf["a"] > val
+        assert_dataframe_equal_pandas(df[mask_df], pdf[mask_pdf])
 
-#     def test_loc_getitem_list(self):
-#         df = lt.DataFrame(example_list_dict)
-#         pdf = pd.DataFrame(example_list_dict)
-#         keydf = ["a", "b"]
-#         assert (df.loc[keys] == pdf.loc[keys]).all()
+    def test_getitem_series(self):
+        df = lt.DataFrame(example_list_dict)
+        pdf = pd.DataFrame(example_list_dict)
+        indexes = lt.Series(df.columns[:1])
+        pindexes = pd.Series(pdf.columns[:1])
+        assert_dataframe_equal_pandas(df[indexes], pdf[pindexes])
 
-#     def test_loc_setitem_list(self):
-#         df = lt.DataFrame(example_list_dict)
-#         pdf = pd.DataFrame(example_list_dict)
-#         keydf = ["a", "b"]
-#         value = 4
-#         df.loc[keys] = value
-#         pdf.loc[keys] = value
-#         assert (df.loc[keys] == pdf.loc[keys]).all()
+    def test_loc_getitem_scalar(self):
+        df = lt.DataFrame(example_list_dict)
+        pdf = pd.DataFrame(example_list_dict)
+        assert_series_equal_pandas(df.loc[0], pdf.loc[0])
+        assert_series_equal_pandas(df.loc[1], pdf.loc[1])
+        assert_series_equal_pandas(df.loc[2], pdf.loc[2])
+        assert_series_equal_pandas(df.loc[0, :], pdf.loc[0, :])
+        assert_series_equal_pandas(df.loc[1, :], pdf.loc[1, :])
+        assert_series_equal_pandas(df.loc[2, :], pdf.loc[2, :])
+        assert_series_equal_pandas(df.loc[:, "a"], pdf.loc[:, "a"])
+        assert_series_equal_pandas(df.loc[:, "b"], pdf.loc[:, "b"])
+        assert df.loc[0, "b"] == pdf.loc[0, "b"]
+        assert df.loc[1, "a"] == pdf.loc[1, "a"]
 
-#     def test_loc_get_not_hashable_key(self):
-#         df = lt.DataFrame(example_list_dict)
-#         with pytest.raises(TypeError, match="Cannot index"):
-#             df.loc[{1, 2, 3}]
+    # def test_loc_setitem_scalar(self):
+    #     df = lt.DataFrame(example_list_dict)
+    #     pdf = pd.DataFrame(example_list_dict)
+    #     key = "a"
+    #     value = 4
+    #     df.loc[key] = value
+    #     pdf.loc[key] = value
+    #     assert df.loc[key] == ps[key]
 
-#     def test_loc_set_not_hashable_key(self):
-#         df = lt.DataFrame(example_list_dict)
-#         with pytest.raises(TypeError, match="Cannot index"):
-#             df.loc[{1, 2, 3}] = "no!"
+    def test_loc_getitem_list(self):
+        df = lt.DataFrame(example_list_dict)
+        pdf = pd.DataFrame(example_list_dict)
+        cols = ["a", "b"]
+        assert_dataframe_equal_pandas(df.loc[:, cols], pdf.loc[:, cols])
 
-#     def test_iloc_getitem_scalar(self):
-#         df = lt.DataFrame(example_list_dict)
-#         pdf = pd.DataFrame(example_list_dict)
-#         index = 0
-#         assert df.iloc[index] == pdf.iloc[index]
-#         index = 1
-#         assert df.iloc[index] == pdf.iloc[index]
-#         index = 2
-#         assert df.iloc[index] == pdf.iloc[index]
+    #     def test_loc_setitem_list(self):
+    #         df = lt.DataFrame(example_list_dict)
+    #         pdf = pd.DataFrame(example_list_dict)
+    #         keydf = ["a", "b"]
+    #         value = 4
+    #         df.loc[keys] = value
+    #         pdf.loc[keys] = value
+    #         assert (df.loc[keys] == pdf.loc[keys]).all()
 
-#     def test_iloc_setitem_scalar(self):
-#         df = lt.DataFrame(example_list_dict)
-#         pdf = pd.DataFrame(example_list_dict)
-#         index = 0
-#         value = 4
-#         df.iloc[index] = value
-#         pdf.iloc[index] = value
-#         assert df.iloc[index] == pdf.iloc[index]
+    def test_loc_get_not_hashable_key(self):
+        df = lt.DataFrame(example_list_dict)
+        with pytest.raises(TypeError, match="Cannot index"):
+            df.loc[{1, 2, 3}]
 
-#     def test_iloc_getitem_slice(self):
-#         df = lt.DataFrame(example_list_dict)
-#         pdf = pd.DataFrame(example_list_dict)
-#         indexedf = slice(0, 2, 1)
-#         assert (df.iloc[indexes] == pdf.iloc[indexes]).all()
+    #     def test_loc_set_not_hashable_key(self):
+    #         df = lt.DataFrame(example_list_dict)
+    #         with pytest.raises(TypeError, match="Cannot index"):
+    #             df.loc[{1, 2, 3}] = "no!"
 
-#     def test_iloc_setitem_slice(self):
-#         df = lt.DataFrame(example_list_dict)
-#         pdf = pd.DataFrame(example_list_dict)
-#         indexedf = slice(0, 2, 1)
-#         value = 4
-#         df.iloc[indexes] = value
-#         pdf.iloc[indexes] = value
-#         assert (df.iloc[indexes] == pdf.iloc[indexes]).all()
+    def test_iloc_getitem_scalar(self):
+        df = lt.DataFrame(example_list_dict)
+        pdf = pd.DataFrame(example_list_dict)
+        assert_series_equal_pandas(df.iloc[0], pdf.iloc[0])
+        assert_series_equal_pandas(df.iloc[1], pdf.iloc[1])
+        assert_series_equal_pandas(df.iloc[2], pdf.iloc[2])
+        assert_series_equal_pandas(df.iloc[0, :], pdf.iloc[0, :])
+        assert_series_equal_pandas(df.iloc[1, :], pdf.iloc[1, :])
+        assert_series_equal_pandas(df.iloc[2, :], pdf.iloc[2, :])
+        assert_series_equal_pandas(df.iloc[:, 0], pdf.iloc[:, 0])
+        assert_series_equal_pandas(df.iloc[:, 1], pdf.iloc[:, 1])
+        assert df.iloc[0, 1] == pdf.iloc[0, 1]
+        assert df.iloc[1, 0] == pdf.iloc[1, 0]
 
-#     def test_iloc_getitem_list(self):
-#         df = lt.DataFrame(example_list_dict)
-#         pdf = pd.DataFrame(example_list_dict)
-#         indexedf = [0, 1]
-#         assert (df.iloc[indexes] == pdf.iloc[indexes]).all()
+    #     def test_iloc_setitem_scalar(self):
+    #         df = lt.DataFrame(example_list_dict)
+    #         pdf = pd.DataFrame(example_list_dict)
+    #         index = 0
+    #         value = 4
+    #         df.iloc[index] = value
+    #         pdf.iloc[index] = value
+    #         assert df.iloc[index] == pdf.iloc[index]
 
-#     def test_iloc_setitem_list(self):
-#         df = lt.DataFrame(example_list_dict)
-#         pdf = pd.DataFrame(example_list_dict)
-#         indexedf = [0, 1]
-#         value = 4
-#         df.iloc[indexes] = value
-#         pdf.iloc[indexes] = value
-#         assert (df.iloc[indexes] == pdf.iloc[indexes]).all()
+    def test_iloc_getitem_slice(self):
+        df = lt.DataFrame(example_list_dict)
+        pdf = pd.DataFrame(example_list_dict)
+        indexes = slice(0, 2, 1)
+        assert_dataframe_equal_pandas(df.iloc[indexes], pdf.iloc[indexes])
 
-#     def test_iloc_get_error(self):
-#         df = lt.DataFrame(example_list_dict)
-#         with pytest.raises(TypeError, match="Cannot index"):
-#             df.iloc[{1, 2, 3}]
+    #     def test_iloc_setitem_slice(self):
+    #         df = lt.DataFrame(example_list_dict)
+    #         pdf = pd.DataFrame(example_list_dict)
+    #         indexedf = slice(0, 2, 1)
+    #         value = 4
+    #         df.iloc[indexes] = value
+    #         pdf.iloc[indexes] = value
+    #         assert (df.iloc[indexes] == pdf.iloc[indexes]).all()
 
-#     def test_loc_set_error(self):
-#         df = lt.DataFrame(example_list_dict)
-#         with pytest.raises(TypeError, match="Cannot index"):
-#             df.iloc[{1, 2, 3}] = "no!"
+    def test_iloc_getitem_list(self):
+        df = lt.DataFrame(example_list_dict)
+        pdf = pd.DataFrame(example_list_dict)
+        indexes = [0, 1]
+        assert_dataframe_equal_pandas(df.iloc[indexes], pdf.iloc[indexes])
 
-#     def test_head(self):
-#         df = lt.DataFrame(example_list_dict)
-#         pdf = pd.DataFrame(example_list_dict)
-#         n = 2
-#         assert len(df.head(n)) == n
-#         assert (df.head(n) == example_values[:n]).all()
-#         assert (df.head(n) == pdf.head(n)).all()
+    #     def test_iloc_setitem_list(self):
+    #         df = lt.DataFrame(example_list_dict)
+    #         pdf = pd.DataFrame(example_list_dict)
+    #         indexedf = [0, 1]
+    #         value = 4
+    #         df.iloc[indexes] = value
+    #         pdf.iloc[indexes] = value
+    #         assert (df.iloc[indexes] == pdf.iloc[indexes]).all()
+
+    #     def test_iloc_get_error(self):
+    #         df = lt.DataFrame(example_list_dict)
+    #         with pytest.raises(TypeError, match="Cannot index"):
+    #             df.iloc[{1, 2, 3}]
+
+    #     def test_loc_set_error(self):
+    #         df = lt.DataFrame(example_list_dict)
+    #         with pytest.raises(TypeError, match="Cannot index"):
+    #             df.iloc[{1, 2, 3}] = "no!"
+
+    def test_head(self):
+        df = lt.DataFrame(example_list_dict)
+        pdf = pd.DataFrame(example_list_dict)
+        n = 2
+        assert_dataframe_equal_pandas(df.head(n), pdf.head(n))
+
+    def test_tail(self):
+        df = lt.DataFrame(example_list_dict)
+        pdf = pd.DataFrame(example_list_dict)
+        n = 2
+        assert_dataframe_equal_pandas(df.tail(n), pdf.tail(n))
+
 
 #     def test_tail(self):
 #         df = lt.DataFrame(example_list_dict)
