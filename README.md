@@ -5,7 +5,6 @@
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/lontras.svg)](https://pypi.org/project/lontras)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](https://opensource.org/license/mit)
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/luxedo/lontras/publish.yml)
-[![pre-commit.ci status](https://results.pre-commit.ci/badge/github/luxedo/lontras/main.svg)](https://results.pre-commit.ci/latest/github/luxedo/lontras/main)
 ![Codecov](https://img.shields.io/codecov/c/github/luxedo/lontras)
 ![CodeFactor Grade](https://img.shields.io/codefactor/grade/github/luxedo/lontras)
 

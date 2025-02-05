@@ -232,38 +232,53 @@ class TestDataFrameInit:
         pdf = pd.DataFrame([[(0, 1), (2, 3)], [(4, 5), (6, 7)]])
         assert str(df) == str(pdf)
 
+    def test_shallow_copy(self):
+        df = lt.DataFrame([[[123]]])
+        t = df.copy(deep=False)
+        df.iloc[0, 0][0] = 456
+        assert (t == df).all(axis=None)
+        assert df.iloc[0, 0] == [456]
 
-#     def test_shallow_copy(self):
-#         df = lt.DataFrame([[123]])
-#         t = df.copy(deep=False)
-#         df.iloc[0][0] = [456]
-#         assert (t == s).all()
+    def test_deepcopy(self):
+        df = lt.DataFrame([[[123]]])
+        t = df.copy()
+        df.iloc[0, 0][0] = 456
+        assert (t != df).all(axis=None)
+        assert df.iloc[0, 0] == [456]
+        assert t.iloc[0, 0] == [123]
 
-#     def test_deepcopy(self):
-#         df = lt.DataFrame([[123]])
-#         t = df.copy()
-#         df.iloc[0][0] = [456]
-#         assert (t != s).all()
+    def test_index_getter(self):
+        df = lt.DataFrame(example_list_dict)
+        assert df.index == list(range(len(example_list_dict)))
 
-#     def test_index_getter(self):
-#         df = lt.DataFrame(example_list_dict)
-#         assert df.index == list(example_index)
+    def test_index_setter(self):
+        df = lt.DataFrame(example_list_dict)
+        df.index = list(reversed(example_index))
+        assert df.index == list(reversed(example_index))
 
-#     def test_index_setter(self):
-#         df = lt.DataFrame(example_list_dict)
-#         df.index = list(reversed(example_index))
-#         assert df.index == list(reversed(example_index))
+    def test_index_setter_error(self):
+        df = lt.DataFrame(example_list_dict)
+        with pytest.raises(ValueError, match="Length mismatch"):
+            df.index = [*list(example_index), "more_indexes"]
 
-#     def test_index_setter_error(self):
-#         df = lt.DataFrame(example_list_dict)
-#         with pytest.raises(ValueError, match="Length mismatch"):
-#             df.index = [*list(example_index), "more_indexes"]
+    def test_columns_getter(self):
+        df = lt.DataFrame(example_list_dict)
+        assert df.columns == list(example_list_dict[0].keys())
 
-# def test_T(self):
-#     df = lt.DataFrame(example_list_dict)
-#     pdf = pd.DataFrame(example_list_dict)
-#     assert (df.T == pdf.T).all(axis=None)
-#     assert (pdf.T == df.T).all(axis=None)
+    def test_columns_setter(self):
+        df = lt.DataFrame(example_list_dict)
+        df.columns = example_columns
+        assert df.columns == example_columns
+
+    def test_columns_setter_error(self):
+        df = lt.DataFrame(example_list_dict)
+        with pytest.raises(ValueError, match="Length mismatch"):
+            df.columns = [*list(example_columns), "more_columnses"]
+
+    def test_transpose(self):
+        df = lt.DataFrame(example_list_dict)
+        pdf = pd.DataFrame(example_list_dict)
+        assert_dataframe_equal_pandas(df.T, pdf.T)
 
 
 class TestDataFrameAccessors:
@@ -332,14 +347,28 @@ class TestDataFrameAccessors:
         assert df.loc[0, "b"] == pdf.loc[0, "b"]
         assert df.loc[1, "a"] == pdf.loc[1, "a"]
 
-    # def test_loc_setitem_scalar(self):
-    #     df = lt.DataFrame(example_list_dict)
-    #     pdf = pd.DataFrame(example_list_dict)
-    #     key = "a"
-    #     value = 4
-    #     df.loc[key] = value
-    #     pdf.loc[key] = value
-    #     assert df.loc[key] == ps[key]
+    def test_loc_setitem_scalar(self):
+        df = lt.DataFrame(example_list_dict)
+        pdf = pd.DataFrame(example_list_dict)
+        column = "a"
+        value = 4
+        df.loc[:, column] = value
+        pdf.loc[:, column] = value
+        assert_dataframe_equal_pandas(df, pdf)
+        df = lt.DataFrame(example_list_dict)
+        pdf = pd.DataFrame(example_list_dict)
+        index = 1
+        value = 9
+        df.loc[index] = value
+        pdf.loc[index] = value
+        assert_dataframe_equal_pandas(df, pdf)
+        df = lt.DataFrame(example_list_dict)
+        pdf = pd.DataFrame(example_list_dict)
+        index = 2
+        value = 9
+        df.loc[index, :] = value
+        pdf.loc[index, :] = value
+        assert_dataframe_equal_pandas(df, pdf)
 
     def test_loc_getitem_list(self):
         df = lt.DataFrame(example_list_dict)

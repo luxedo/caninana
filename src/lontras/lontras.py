@@ -75,22 +75,29 @@ class LocSeriesIndexer(BaseScalar["Series"]):
         raise TypeError(msg)
 
     def __setitem__(self, label: LocIndexes, value: Scalar | ArrayLike):
-        if isinstance(label, list):
-            if _is_array_like(value):
-                if len(label) != len(value):
-                    msg = "cannot set using a list-like indexer with a different length than the valuel"
-                    raise ValueError(msg)
-                for k, v in zip(label, value):
-                    self.data[k] = v
-            else:
-                for k in label:
-                    self.data[k] = value
-            return
-        if isinstance(label, Scalar):
-            self.data[label] = value
-            return
-        msg = f"Cannot index with unhashable: {label=}"
-        raise TypeError(msg)
+        labels: list[Scalar]
+        match label:
+            case list():
+                labels = label
+            case slice():
+                labels = list(self.data.index[label])
+            case _ if _is_scalar(label):
+                labels = [label]
+            case _:
+                msg = f"Cannot index with unhashable: {label=}"
+                raise TypeError(msg)
+
+        values: list[Any]
+        if not _is_array_like(value):
+            values = [value for _ in range(len(labels))]
+        else:
+            if len(labels) != len(value):
+                msg = "cannot set using a list-like indexer with a different length than the valuel"
+                raise ValueError(msg)
+            values = list(value)
+
+        for k, v in zip(labels, values):
+            self.data[k] = v
 
 
 class IlocSeriesIndexer(BaseScalar["Series"]):
@@ -103,7 +110,6 @@ class IlocSeriesIndexer(BaseScalar["Series"]):
 
     def __setitem__(self, index: IlocIndexes, value: Scalar | ArrayLike):
         self.data.loc.__setitem__(self._index_to_labels(index), value)
-        # return super().__setitem__(self._index_to_labels(index), value)
 
 
 class LocDataFrameIndexer(BaseScalar["DataFrame"]):
@@ -122,6 +128,10 @@ class LocDataFrameIndexer(BaseScalar["DataFrame"]):
         msg = "nooo"
         raise ValueError(msg)
 
+    @overload
+    def _columns_to_labels(self, index: int) -> Scalar: ...
+    @overload
+    def _columns_to_labels(self, index: slice | list[int] | Series) -> list[Scalar]: ...
     def _columns_to_labels(self, index: int | slice | list[int] | Series) -> Scalar | list[Scalar]:
         match index:
             case int():
@@ -158,8 +168,35 @@ class LocDataFrameIndexer(BaseScalar["DataFrame"]):
                 msg = f"Cannot index with unhashable: {label=}"
                 raise TypeError(msg)
 
-    def __setitem__(self, label: LocIndexes, value: Scalar | Mapping | DataFrame):
-        pass
+    def __setitem__(self, label: LocIndexes | tuple[LocIndexes, LocIndexes], value: Scalar | Mapping | DataFrame):
+        col_labels: LocIndexes
+        row_labels: LocIndexes
+        match label:
+            case (row_labels, col_labels) if isinstance(label, tuple):
+                match col_labels:
+                    case slice():
+                        col_labels = self._columns_to_labels(col_labels)
+                    case Series():
+                        col_labels = list(col_labels.values)
+                    case list():
+                        pass
+                    case c if _is_scalar(c):
+                        col_labels = [c]
+                    case _:
+                        msg = f"Cannot index with unhashable: {label=}"
+                        raise TypeError(msg)
+            case list() | slice() | Series():
+                row_labels = label
+                col_labels = list(self.data.columns)
+            case l if _is_scalar(l):
+                row_labels = l
+                col_labels = list(self.data.columns)
+            case _:
+                msg = f"Cannot index with unhashable: {label=}"
+                raise TypeError(msg)
+
+        for col in col_labels:
+            self.data.data[col].loc[row_labels] = value
 
 
 class IlocDataFrameIndexer(BaseScalar["DataFrame"]):
@@ -182,7 +219,7 @@ class IlocDataFrameIndexer(BaseScalar["DataFrame"]):
         match index:
             case (row_indexes, col_indexes) if isinstance(index, tuple):
                 return self.data.loc.__setitem__(
-                    (self._index_to_labels(row_indexes), self.data.locdata.loc._columns_to_labels(col_indexes)),  # noqa: SLF001
+                    (self._index_to_labels(row_indexes), self.data.loc._columns_to_labels(col_indexes)),  # noqa: SLF001
                     value,
                 )
             case _:
@@ -1142,11 +1179,12 @@ class DataFrame(UserDict):
         columns (Index): The column labels of the DataFrame. Used for label-based column selection.
     """
 
-    index: Index
-    columns: Index
+    _index: Index
+    _columns: Index
     loc: LocDataFrameIndexer
     iloc: IlocDataFrameIndexer
-    __slots__ = ("name", "index", "loc", "iloc")
+    data: dict[Scalar, Series]
+    __slots__ = ("_index", "_columns", "loc", "iloc")
 
     ###########################################################################
     # Initializer and general methods
@@ -1203,8 +1241,8 @@ class DataFrame(UserDict):
         if (index is not None and len(index) > 0) or (columns is not None and len(columns) > 0):
             msg = "Cannot create an empty DataFrame with preset columns and/or indexes"
             raise ValueError(msg)
-        self.index = []
-        self.columns = []
+        self._index = []
+        self._columns = []
 
     def _init_mapping_of_series(
         self, data: Mapping[Scalar, Series], index: Index | None = None, columns: Index | None = None
@@ -1215,14 +1253,16 @@ class DataFrame(UserDict):
             self._init_empty(index, columns)
             return
 
-        self.index = val0.index if index is None else index
-        self.columns = list(data.keys()) if columns is None else columns
-        if (len(self.index) != len(val0.index)) or (len(self.columns) != len(data)):
+        self._index = val0.index if index is None else index
+        self._columns = list(data.keys()) if columns is None else columns
+        if (len(self._index) != len(val0.index)) or (len(self._columns) != len(data)):
             passed = (len(val0.index), len(data))
-            implied = (len(self.index), len(self.columns))
+            implied = (len(self._index), len(self._columns))
             msg = f"Shape of passed values is {passed}, indices imply {implied}"
             raise ValueError(msg)
-        super().__init__({col: s.copy().rename(col).reindex(self.index) for col, s in zip(self.columns, data.values())})
+        super().__init__(
+            {col: s.copy().rename(col).reindex(self._index) for col, s in zip(self._columns, data.values())}
+        )
 
     def _init_collection_of_series(
         self, data: ArrayLike[Series], index: Index | None = None, columns: Index | None = None
@@ -1234,33 +1274,33 @@ class DataFrame(UserDict):
             return
 
         if columns is not None:
-            self.columns = columns
+            self._columns = columns
         else:
-            self.columns = src_columns
+            self._columns = src_columns
         if any(d.index != src_columns for d in data):
             all_cols = {item for d in data for item in d.index}
-            missing_cols = all_cols - set(self.columns) or "{}"
-            extra_cols = set(self.columns) - all_cols or "{}"
-            msg = f"Misaligned columns. Expected {self.columns}. Missing: {missing_cols}, Extra: {extra_cols}"
+            missing_cols = all_cols - set(self._columns) or "{}"
+            extra_cols = set(self._columns) - all_cols or "{}"
+            msg = f"Misaligned columns. Expected {self._columns}. Missing: {missing_cols}, Extra: {extra_cols}"
             raise ValueError(msg)
 
         # @TODO: Deal with Series with names
-        self.index = list(range(len(data))) if index is None else index
-        if (len(self.index) != len(data)) or (len(self.columns) != len(src_columns)):
+        self._index = list(range(len(data))) if index is None else index
+        if (len(self._index) != len(data)) or (len(self._columns) != len(src_columns)):
             passed = (len(data), len(src_columns))
-            implied = (len(self.index), len(self.columns))
+            implied = (len(self._index), len(self._columns))
             msg = f"Shape of passed values is {passed}, indices imply {implied}"
             raise ValueError(msg)
         super().__init__(
             {
-                dst_col: Series({idx: row[src_col] for idx, row in zip(self.index, data)}, name=dst_col)
-                for src_col, dst_col in zip(src_columns, self.columns)
+                dst_col: Series({idx: row[src_col] for idx, row in zip(self._index, data)}, name=dst_col)
+                for src_col, dst_col in zip(src_columns, self._columns)
             }
         )
 
     def _validate_index_and_columns(self):
         for col, s in self.items():
-            if s.index != self.index:
+            if s.index != self._index:
                 msg = "Somehow the inner indexes and DataFrame indexex don't match. This shouldn't happen!"
                 raise ValueError(msg)
             if s.name != col:
@@ -1300,6 +1340,60 @@ class DataFrame(UserDict):
         clone = copy.deepcopy(self) if deep else copy.copy(self)
         clone._set_indexers()  # noqa: SLF001
         return clone
+
+    @property
+    def index(self) -> Index:
+        """
+        Returns the index of the DataFrame.
+
+        Returns:
+            Index: The index of the DataFrame.
+        """
+        return self._index
+
+    @index.setter
+    def index(self, index: Index):
+        """
+        Sets the index of the DataFrame.
+
+        Args:
+            value (Index): The new index for the DataFrame.
+
+        Raises:
+            ValueError: If the length of the new index does not match the length of the Series.
+        """
+        if len(self) != len(index):
+            msg = f"Length mismatch: Expected axis has {len(self)} elements, new values have {len(index)} elements"
+            raise ValueError(msg)
+        self._index = index
+        for s in self.data.values():
+            s.index = index
+
+    @property
+    def columns(self) -> Index:
+        """
+        Returns the columns of the DataFrame.
+
+        Returns:
+            Index: The columns of the DataFrame.
+        """
+        return self._columns
+
+    @columns.setter
+    def columns(self, columns: Index):
+        """
+        Sets the columns of the DataFrame.
+
+        Args:
+            columns (Index): The new index for the DataFrame.
+
+        Raises:
+            ValueError: If the length of the new index does not match the length of the Series.
+        """
+        if len(self.columns) != len(columns):
+            msg = f"Length mismatch: Expected axis has {len(self)} elements, new values have {len(columns)} elements"
+            raise ValueError(msg)
+        self._columns = columns
 
     @property
     def T(self) -> DataFrame:  # noqa: N802
@@ -1448,22 +1542,24 @@ class DataFrame(UserDict):
             TypeError: If the other object is not a DataFrame or Series.
         """
         not_aligned_msg = "matrices are not aligned"
-        if isinstance(other, DataFrame):
-            if list(self.columns) != list(other.index):
-                raise ValueError(not_aligned_msg)
-            data = [[s_a.dot(s_b) for s_b in other.data.values()] for s_a in self.T.data.values()]
-            return DataFrame(data, index=self.index, columns=other.columns)
-        if isinstance(other, ArrayLike):
-            if len(self.columns) != len(other):
-                raise ValueError(not_aligned_msg)
-            if not isinstance(other, Series):
-                other = Series(other, index=self.columns)
-            if list(self.columns) != list(other.index):
-                raise ValueError(not_aligned_msg)
-            data = [s_a.dot(other) for s_a in self.T.data.values()]
-            return Series(data, index=self.index, name=other.name)
-        msg = "Dot product requires other to be a DataFrame or Series."
-        raise TypeError(msg)
+        match other:
+            case DataFrame():
+                if list(self.columns) != list(other.index):
+                    raise ValueError(not_aligned_msg)
+                df_data = [[s_a.dot(s_b) for s_b in other.data.values()] for s_a in self.T.data.values()]
+                return DataFrame(df_data, index=self.index, columns=other.columns)
+            case Series() | ArrayLike():
+                if len(self.columns) != len(other):
+                    raise ValueError(not_aligned_msg)
+                if not isinstance(other, Series):
+                    other = Series(other, index=self.columns)
+                if list(self.columns) != list(other.index):
+                    raise ValueError(not_aligned_msg)
+                s_data = [sa.dot(other) for sa in self.T.data.values()]
+                return Series(s_data, index=self.index, name=other.name)
+            case _:
+                msg = "Dot product requires other to be a DataFrame or Series."
+                raise TypeError(msg)
 
     def abs(self) -> DataFrame:
         """
