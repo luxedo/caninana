@@ -499,6 +499,37 @@ class Series(UserDict):
         return None
 
     ###########################################################################
+    # Merge/Concatenate
+    ###########################################################################
+    def append(self, other: Series | Mapping) -> Series:
+        """
+        Appends `other` to the end of the Series
+
+        Args:
+            other (Series | Mapping): The data to append
+
+        Returns:
+            Series: A new Series with new data
+        """
+        # @TODO: Should we support ArrayLike too?
+        match other:
+            case Series():
+                duplicate_index = set(self.index) & set(other.index)
+                if len(duplicate_index) > 0:
+                    msg = f"Cannot append with duplicate indexes: {duplicate_index}"
+                    raise ValueError(msg)
+                return Series(self.data | other.data)
+            case Mapping():
+                duplicate_index = set(self.index) & set(other.keys())
+                if len(duplicate_index) > 0:
+                    msg = f"Cannot append with duplicate indexes: {duplicate_index}"
+                    raise ValueError(msg)
+                return Series(self.data | dict(other))
+            case _:
+                msg = f"Cannot append with: {other=}"
+                raise ValueError(msg)
+
+    ###########################################################################
     # Auxiliary Functions
     ###########################################################################
     def _other_as_series(self, other: Series | Scalar | ArrayLike) -> Series:
@@ -1354,6 +1385,15 @@ class DataFrame(UserDict):
                 msg = "Somehow the inner columns and DataFrame columns don't match. This shouldn't happen!"
                 raise ValueError(msg)
 
+    @staticmethod
+    def _validate_axis(axis: Any):
+        match axis:
+            case int(c) if c in (AxisRows, AxisCols):
+                pass
+            case _:
+                msg = f"No axis named {axis} for object type DataFrame"
+                raise ValueError(msg)
+
     def _set_indexers(self):
         self.iloc = IlocDataFrameIndexer(self)
         self.loc = LocDataFrameIndexer(self)
@@ -1555,14 +1595,14 @@ class DataFrame(UserDict):
         Returns:
             Series: Results of applying the method along specified axis.
         """
+        self._validate_axis(axis)
         match axis:
             case int(c) if c == AxisRows:
                 return Series({col: method(s) for col, s in self.items()})
             case int(c) if c == AxisCols:
                 return self.T.apply(method, axis=0)
-            case _:
-                msg = f"No axis named {axis} for object type DataFrame"
-                raise ValueError(msg)
+            case unreachable:  # no cov
+                assert_never(unreachable)  # type: ignore # @TODO: How to exhaust this check?
 
     def _apply_with_none(self, method: Callable[[Series], Any], axis: AxisOrNone = 0):
         match axis:
@@ -1589,14 +1629,14 @@ class DataFrame(UserDict):
         Returns:
             Series: Aggregation results.
         """
+        self._validate_axis(axis)
         match axis:
             case int(c) if c == AxisRows:
                 return Series({col: method(s.values) for col, s in self.items()})
             case int(c) if c == AxisCols:
                 return self.T.agg(method, axis=0)
-            case _:
-                msg = f"No axis named {axis} for object type DataFrame"
-                raise ValueError(msg)
+            case unreachable:  # no cov
+                assert_never(unreachable)  # type: ignore # @TODO: How to exhaust this check?
 
     def _agg_with_none(self, method: Callable[[ArrayLike[Any]], Any], axis: AxisOrNone = 0):
         match axis:
@@ -1808,6 +1848,44 @@ class DataFrame(UserDict):
             Series: The labels of the minimum values
         """
         return self._apply_with_none(lambda s: s.idxmin(), axis)
+
+    ###########################################################################
+    # GroupBy
+    ###########################################################################
+
+    ###########################################################################
+    # Merge/Concatenate
+    ###########################################################################
+    def append(self, other: DataFrame, axis: Axis = 0) -> DataFrame:
+        """
+        Appends `other` to the end of the DataFrame
+
+        Args:
+            other (DataFrame): The data to append
+            axis: Axis to aggregate along:
+                - 0: Aggregate each column (default)
+                - 1: Aggregate each row
+
+        Returns:
+            DataFrame: A new DataFrame with new data
+        """
+        # @TODO: Support more data types for other?
+        self._validate_axis(axis)
+        match axis:
+            case int(c) if c == AxisRows:
+                missing_columns = set(self.columns) ^ set(other.columns)
+                if len(missing_columns) > 0:
+                    msg = f"Cannot append data with missing columns: {missing_columns}"
+                    raise ValueError(msg)
+                return DataFrame({col: s.append(other[col]) for col, s in self.data.items()})
+            case int(c) if c == AxisCols:
+                missing_indexes = set(self.index) ^ set(other.index)
+                if len(missing_indexes) > 0:
+                    msg = f"Cannot append data with missing indexes: {missing_indexes}"
+                    raise ValueError(msg)
+                return DataFrame(dict(self.data | other.data))
+            case unreachable:  # no cov
+                assert_never(unreachable)  # type: ignore # @TODO: How to exhaust this check?
 
     ###########################################################################
     # Statistics

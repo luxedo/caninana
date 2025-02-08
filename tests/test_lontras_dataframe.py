@@ -281,6 +281,39 @@ class TestDataFrameInit:
         assert_dataframe_equal_pandas(df.T, pdf.T)
 
 
+class TestMergeConcatenate:
+    def test_append_axis_0(self):
+        dfa = lt.DataFrame(example_list_dict)
+        pdfa = pd.DataFrame(example_list_dict)
+        new_values = {"a": {3: 10}, "b": {3: 11}}
+        dfb = lt.DataFrame(new_values)
+        pdfb = pd.DataFrame(new_values)
+        assert_dataframe_equal_pandas(dfa.append(dfb), pd.concat([pdfa, pdfb]))
+        assert_dataframe_equal_pandas(dfa.append(dfb, axis=0), pd.concat([pdfa, pdfb], axis=0))
+
+    def test_append_axis_0_error(self):
+        dfa = lt.DataFrame(example_list_dict)
+        new_values = {"a": {3: 10}, "c": {3: 11}}
+        dfb = lt.DataFrame(new_values)
+        with pytest.raises(ValueError, match="Cannot append data with missing columns:"):
+            dfa.append(dfb, axis=0)
+
+    def test_append_axis_1(self):
+        dfa = lt.DataFrame(example_list_dict)
+        pdfa = pd.DataFrame(example_list_dict)
+        new_values = {"c": [10, 11, 12]}
+        dfb = lt.DataFrame(new_values)
+        pdfb = pd.DataFrame(new_values)
+        assert_dataframe_equal_pandas(dfa.append(dfb, axis=1), pd.concat([pdfa, pdfb], axis=1))
+
+    def test_append_axis_1_error(self):
+        dfa = lt.DataFrame(example_list_dict)
+        new_values = {"c": [10, 11]}
+        dfb = lt.DataFrame(new_values)
+        with pytest.raises(ValueError, match="Cannot append data with missing indexes:"):
+            dfa.append(dfb, axis=1)
+
+
 class TestDataFrameAccessors:
     def test_getitem_columns(self):
         df = lt.DataFrame(example_list_dict)

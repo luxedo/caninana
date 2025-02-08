@@ -151,6 +151,28 @@ class TestSeriesInit:
         assert s.shape == (len(example_dict),)
 
 
+class TestMergeConcatenate:
+    def test_append(self):
+        sa = lt.Series(example_dict)
+        psa = pd.Series(example_dict)
+        new_values = {"j": 10, "k": 11}
+        sb = lt.Series(new_values)
+        psb = pd.Series(new_values)
+        assert_series_equal_pandas(sa.append(sb), pd.concat([psa, psb]))
+        assert_series_equal_pandas(sa.append(new_values), pd.concat([psa, psb]))
+
+    def test_append_error(self):
+        sa = lt.Series(example_dict)
+        new_values = {"a": "nooo"}
+        sb = lt.Series(new_values)
+        with pytest.raises(ValueError, match="Cannot append with duplicate indexes:"):
+            sa.append(new_values)
+        with pytest.raises(ValueError, match="Cannot append with duplicate indexes:"):
+            sa.append(sb)
+        with pytest.raises(ValueError, match="Cannot append with: other="):
+            sa.append(int)
+
+
 class TestSeriesAccessors:
     def test_getitem_scalar(self):
         s = lt.Series(example_dict)
