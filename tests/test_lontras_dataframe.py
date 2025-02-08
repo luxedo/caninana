@@ -695,23 +695,29 @@ class TestDataFrameStatistics:
         [
             "mean",
             "median",
+        ],
+    )
+    def test_statistics_axis_or_none(self, func):
+        df = lt.DataFrame(example_list_dict)
+        pdf = pd.DataFrame(example_list_dict)
+        assert_series_equal_pandas(getattr(df, func)(), getattr(pdf, func)())
+        assert_series_equal_pandas(getattr(df, func)(axis=0), getattr(pdf, func)(axis=0))
+        assert_series_equal_pandas(getattr(df, func)(axis=1), getattr(pdf, func)(axis=1))
+        assert (getattr(df, func)(axis=None) == float(getattr(pdf, func)(axis=None))) is True
+
+    @pytest.mark.parametrize(
+        "func",
+        [
             "std",
             "var",
         ],
     )
-    def test_statistics(self, func):
+    def test_statistics_axis(self, func):
         df = lt.DataFrame(example_list_dict)
         pdf = pd.DataFrame(example_list_dict)
-        assert getattr(df, func)() == getattr(pdf, func)()
-        assert getattr(df, func)(axis=0) == getattr(pdf, func)(axis=0)
-        assert getattr(df, func)(axis=1) == getattr(pdf, func)(axis=1)
-        if func in ["std", "var"]:
-            # The behavior of std and var with axis=None is deprecated
-            assert getattr(df, func)(axis=None) == getattr(pdf.values.ravel(), func)(
-                ddof=1
-            )  # Numpy defaults to population std
-        else:
-            assert getattr(df, func)(axis=None) == getattr(pdf, func)(axis=None)
+        assert_series_equal_pandas(getattr(df, func)(), getattr(pdf, func)())
+        assert_series_equal_pandas(getattr(df, func)(axis=0), getattr(pdf, func)(axis=0))
+        assert_series_equal_pandas(getattr(df, func)(axis=1), getattr(pdf, func)(axis=1))
 
     def test_statistics_mode(self):
         # @TODO: This is a mess

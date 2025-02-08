@@ -633,10 +633,10 @@ class Series(UserDict):
 
     def all(self) -> bool:
         """
-        Returns True if all values in the Series are True.
+        Returns True if all values in the Series are truthy.
 
         Returns:
-            bool: True if all values are True, False otherwise.
+            bool: True if all values are truthy, False otherwise.
         """
         return self.agg(all)
 
@@ -1444,6 +1444,18 @@ class DataFrame(UserDict):
 
     @property
     def T(self) -> DataFrame:  # noqa: N802
+        """
+        Return the transpose of the DataFrame, switching rows and columns.
+
+        The transpose (swap of axes) effectively converts columns to rows and rows to columns,
+        maintaining the original data relationships while rotating the DataFrame structure.
+
+        Returns:
+            DataFrame: A new DataFrame instance where:
+                - Original columns become the new index
+                - Original index becomes the new columns
+                - Data values are transposed accordingly
+        """
         data = list(self.data.values())
         return DataFrame(data, index=self.columns[:], columns=self.index[:])
 
@@ -1458,7 +1470,19 @@ class DataFrame(UserDict):
         return self.to_list()
 
     def iterrows(self) -> Generator[tuple[Scalar, Series]]:
-        yield from self.T.items()
+        """
+        Iterate over DataFrame rows as (index, Series) pairs.
+
+        Provides an efficient way to loop through rows of the DataFrame, returning
+        both the index label and the row data as a Series for each iteration.
+
+        Returns:
+            Generator[tuple[Scalar, Series]]: A generator yielding tuples containing:
+                - Index label (Scalar): The label of the current row
+                - Series: Row data
+        """
+        for idx in self.index:
+            yield idx, Series({col: self[col][idx] for col in self.columns}, name=idx)
 
     ###########################################################################
     # Accessors
@@ -1513,6 +1537,24 @@ class DataFrame(UserDict):
     # Apply/Agg/Map/Reduce
     ###########################################################################
     def apply(self, method: Callable[[Series], Any], axis: Axis = 0) -> Series:
+        """
+        Apply a function along a DataFrame axis (columns or rows).
+
+        Processes either each column (axis=0) or each row (axis=1) as a Series object,
+        applying the provided function to each Series. Returns a new Series with
+        aggregated/transformed values.
+
+        Args:
+            method: Callable that takes a Series and returns a scalar value.
+                - For axis=0: Receives each column as a Series
+                - For axis=1: Receives each row as a Series
+            axis: Axis along which to apply:
+                - 0: Apply to each column (default)
+                - 1: Apply to each row
+
+        Returns:
+            Series: Results of applying the method along specified axis.
+        """
         match axis:
             case int(c) if c == AxisRows:
                 return Series({col: method(s) for col, s in self.items()})
@@ -1530,6 +1572,23 @@ class DataFrame(UserDict):
                 return self.apply(method, axis)
 
     def agg(self, method: Callable[[ArrayLike[Any]], Any], axis: Axis = 0) -> Series:
+        """
+        Aggregate data along specified axis using one or more operations.
+
+        Applies aggregation function to raw array values (rather than Series objects)
+        along columns (axis=0) or rows (axis=1). Optimized for numerical aggregations.
+
+        Args:
+            method: Callable that takes array-like data and returns scalar
+                - For axis=0: Receives column values as array
+                - For axis=1: Receives row values as array
+            axis: Axis to aggregate along:
+                - 0: Aggregate each column (default)
+                - 1: Aggregate each row
+
+        Returns:
+            Series: Aggregation results.
+        """
         match axis:
             case int(c) if c == AxisRows:
                 return Series({col: method(s.values) for col, s in self.items()})
@@ -1578,7 +1637,7 @@ class DataFrame(UserDict):
         """
         Compute the matrix multiplication between the DataFrame and another DataFrame or Series.
 
-        Parameters:
+        Args:
             other (DataFrame or Series): The other DataFrame or Series to multiply with.
 
         Returns:
@@ -1624,6 +1683,18 @@ class DataFrame(UserDict):
     @overload
     def max(self, axis: None) -> Scalar: ...  # no cov
     def max(self, axis: AxisOrNone = 0) -> Series | Scalar:
+        """
+        Returns the maximum value in the DataFrame.
+
+        Args:
+            axis: AxisOrNone to aggregate along:
+                - 0: Aggregate each column (default)
+                - 1: Aggregate each row
+                - None: Aggregates along both axes returning a scalar
+
+        Returns:
+            Series | Scalar: The maximum values along the axis
+        """
         return self._apply_with_none(lambda s: s.max(), axis)
 
     @overload
@@ -1633,6 +1704,18 @@ class DataFrame(UserDict):
     @overload
     def min(self, axis: None) -> Scalar: ...  # no cov
     def min(self, axis: AxisOrNone = 0) -> Series | Scalar:
+        """
+        Returns the minimum value in the DataFrame.
+
+        Args:
+            axis: AxisOrNone to aggregate along:
+                - 0: Aggregate each column (default)
+                - 1: Aggregate each row
+                - None: Aggregates along both axes returning a scalar
+
+        Returns:
+            Series | Scalar: The minimum values along the axis
+        """
         return self._apply_with_none(lambda s: s.min(), axis)
 
     @overload
@@ -1642,6 +1725,18 @@ class DataFrame(UserDict):
     @overload
     def sum(self, axis: None) -> Scalar: ...  # no cov
     def sum(self, axis: AxisOrNone = 0) -> Series | Scalar:
+        """
+        Returns the sum of the values in the DataFrame.
+
+        Args:
+            axis: AxisOrNone to aggregate along:
+                - 0: Aggregate each column (default)
+                - 1: Aggregate each row
+                - None: Aggregates along both axes returning a scalar
+
+        Returns:
+            Series | Scalar: The sum of the values along the axis
+        """
         return self._apply_with_none(lambda s: s.sum(), axis)
 
     @overload
@@ -1651,6 +1746,18 @@ class DataFrame(UserDict):
     @overload
     def all(self, axis: None) -> bool: ...  # no cov
     def all(self, axis: AxisOrNone = 0) -> Series | bool:
+        """
+        Returns True if all values in the DataFrame are truthy.
+
+        Args:
+            axis: AxisOrNone to aggregate along:
+                - 0: Aggregate each column (default)
+                - 1: Aggregate each row
+                - None: Aggregates along both axes returning a scalar
+
+        Returns:
+            Series | bool: True if all values are truthy, False otherwise.
+        """
         return self._apply_with_none(lambda s: s.all(), axis)
 
     @overload
@@ -1660,24 +1767,46 @@ class DataFrame(UserDict):
     @overload
     def any(self, axis: None) -> bool: ...  # no cov
     def any(self, axis: AxisOrNone = 0) -> Series | bool:
+        """
+        Returns True if any value in the DataFrame is truthy.
+
+        Args:
+            axis: AxisOrNone to aggregate along:
+                - 0: Aggregate each column (default)
+                - 1: Aggregate each row
+                - None: Aggregates along both axes returning a scalar
+
+        Returns:
+            Series | bool: True if any value is truthy, False otherwise.
+        """
         return self._apply_with_none(lambda s: s.any(), axis)
 
-    @overload
-    def idxmax(self) -> Series: ...  # no cov
-    @overload
-    def idxmax(self, axis: Axis) -> Series: ...  # no cov
-    @overload
-    def idxmax(self, axis: None) -> bool: ...  # no cov
-    def idxmax(self, axis: AxisOrNone = 0) -> Series | bool:
+    def idxmax(self, axis: Axis = 0) -> Series:
+        """
+        Returns the labels of the maximum values.
+
+        Args:
+            axis: Axis to aggregate along:
+                - 0: Aggregate each column (default)
+                - 1: Aggregate each row
+
+        Returns:
+            Series: The labels of the maximum values
+        """
         return self._apply_with_none(lambda s: s.idxmax(), axis)
 
-    @overload
-    def idxmin(self) -> Series: ...  # no cov
-    @overload
-    def idxmin(self, axis: Axis) -> Series: ...  # no cov
-    @overload
-    def idxmin(self, axis: None) -> bool: ...  # no cov
-    def idxmin(self, axis: AxisOrNone = 0) -> Series | bool:
+    def idxmin(self, axis: Axis = 0) -> Series:
+        """
+        Returns the labels of the minimum values.
+
+        Args:
+            axis: Axis to aggregate along:
+                - 0: Aggregate each column (default)
+                - 1: Aggregate each row
+
+        Returns:
+            Series: The labels of the minimum values
+        """
         return self._apply_with_none(lambda s: s.idxmin(), axis)
 
     ###########################################################################
@@ -1691,8 +1820,14 @@ class DataFrame(UserDict):
         """
         Computes the mean of the Series.
 
+        Args:
+            axis: AxisOrNone to aggregate along:
+                - 0: Aggregate each column (default)
+                - 1: Aggregate each row
+                - None: Aggregates along both axes returning a scalar
+
         Returns:
-            float: Series mean
+            Series | float: Axis mean
         """
         return self._agg_with_none(statistics.mean, axis=axis)
 
@@ -1705,8 +1840,14 @@ class DataFrame(UserDict):
         Return the median (middle value) of numeric data, using the common “mean of middle two” method.
         If data is empty, StatisticsError is raised. data can be a sequence or iterable.
 
+        Args:
+            axis: AxisOrNone to aggregate along:
+                - 0: Aggregate each column (default)
+                - 1: Aggregate each row
+                - None: Aggregates along both axes returning a scalar
+
         Returns:
-            float | int: Series median
+            Series | float | int: Axis median
         """
         return self._agg_with_none(statistics.median, axis=axis)
 
@@ -1715,8 +1856,13 @@ class DataFrame(UserDict):
         Return the single most common data point from discrete or nominal data. The mode (when it exists)
         is the most typical value and serves as a measure of central location.
 
+        Args:
+            axis: Axis to aggregate along:
+                - 0: Aggregate each column (default)
+                - 1: Aggregate each row
+
         Returns:
-            Any: Series mode
+            Series: Axis mode
         """
         # @TOOO: Improve this. Might have to implement NaNs
         return self.agg(statistics.mode, axis=axis)
@@ -1726,38 +1872,45 @@ class DataFrame(UserDict):
         Divide data into n continuous intervals with equal probability. Returns a list of `n - 1`
         cut points separating the intervals.
 
+        Args:
+            axis: AxisOrNone to aggregate along:
+                - 0: Aggregate each column (default)
+                - 1: Aggregate each row
+
         Returns:
-            list[float]: List containing quantiles
+            Series: Series of lists containing quantiles
         """
         return self.agg(lambda values: statistics.quantiles(values, n=n, method=method), axis=axis)
 
-    @overload
-    def std(self, xbar, axis: Axis) -> Series: ...  # no cov
-    @overload
-    def std(self, xbar, axis: None) -> Scalar: ...  # no cov
-    def std(self, xbar=None, axis: AxisOrNone = 0) -> Series | Scalar:
+    def std(self, xbar=None, axis: Axis = 0) -> Series | Scalar:
         """
         Return the sample standard deviation (the square root of the sample variance).
         See variance() for arguments and other details.
 
-        Returns:
-            float: Series standard deviation
-        """
-        return self._agg_with_none(lambda values: statistics.stdev(values, xbar=xbar), axis=axis)
+        Args:
+            axis: AxisOrNone to aggregate along:
+                - 0: Aggregate each column (default)
+                - 1: Aggregate each row
 
-    @overload
-    def var(self, xbar, axis: Axis) -> Series: ...  # no cov
-    @overload
-    def var(self, xbar, axis: None) -> Scalar: ...  # no cov
-    def var(self, xbar=None, axis: AxisOrNone = 0) -> Series | Scalar:
+        Returns:
+            Series: Standard deviations along axis
+        """
+        return self.agg(lambda values: statistics.stdev(values, xbar=xbar), axis=axis)
+
+    def var(self, xbar=None, axis: Axis = 0) -> Series | Scalar:
         """
         Return the sample variance of data, an iterable of at least two real-valued numbers.
         Variance, or second moment about the mean, is a measure of the variability
         (spread or dispersion) of data. A large variance indicates that the data is spread out;
         a small variance indicates it is clustered closely around the mean.
 
+        Args:
+            axis: Axis to aggregate along:
+                - 0: Aggregate each column (default)
+                - 1: Aggregate each row
+
         Returns:
-            float: Series variance
+            Series: Variances along axis
         """
         return self._agg_with_none(lambda values: statistics.variance(values, xbar=xbar), axis=axis)
 
