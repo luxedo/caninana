@@ -3,6 +3,6 @@
 # SPDX-License-Identifier: MIT
 
 from lontras.__about__ import __version__
-from lontras.lontras import DataFrame, Series
+from lontras.lontras import Array, DataFrame, Index, Series
 
-__all__ = ["__version__", "DataFrame", "Series"]
+__all__ = ["__version__", "Array", "DataFrame", "Series", "Index"]

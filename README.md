@@ -14,7 +14,7 @@
 >
 > ### The API is not stable and might change over time
 
-> We love `pandas` and its siblings! They're the industry-standard tools for powerful data
+> We love `numpy`, `pandas` and its siblings! They're the industry-standard tools for powerful data
 > manipulation. However, for smaller projects or when minimizing dependencies is paramount,
 > `lontras` offers a lightweight, pure-Python alternative built on simple dictionaries. Designed
 > for ease of use and direct integration, lontras encourages you to copy and paste its core
@@ -25,6 +25,7 @@
 
 - **🤏 Small-scale `DataFrame` operations? `lontras`!**
 - **🚀 Fast `DataFrame` loading, no dependencies? `lontras`!**
+- **🔢 Simple `Array` manipulation library? `lontras`!**
 - **⚙️ Embed `DataFrames` in [MicroPython](https://micropython.org/)? `lontras`!**
 - **🌐 Use `DataFrames` in the browser ([PyScript](https://pyscript.net/))? `lontras`!**
 - **🤝 High [Pandas](https://pandas.pydata.org/) compatibility? `lontras`!**
@@ -67,8 +68,9 @@ core `DataFrame` and `Series` functionalities without external libraries.
 
 ### Data Structures:
 
-- `Series`: A one-dimensional array-like structure.
-- `DataFrame`: A two-dimensional labeled data structure.
+- `Array`: A one-dimensional array-like structure.
+- `Series`: An extended one-dimensional array-like labeled structure.
+- `DataFrame`: A two-dimensional labeled data structure based on `Series`.
 
 ### Accessing Data:
 
