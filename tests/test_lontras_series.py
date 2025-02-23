@@ -65,7 +65,7 @@ class TestSeriesInit:
         with pytest.raises(ValueError, match="Unexpected data type:"):
             lt.Series(int)
 
-    def test__str__(self):
+    def test__repr__(self):
         s = lt.Series()
         assert str(s) == "Series([])"
         s = lt.Series(name=example_name)
@@ -133,6 +133,11 @@ name: snake
         s.index = list(reversed(example_index))
         assert s.index == lt.Index(reversed(example_index))
 
+    def test_index_setter_iterable(self):
+        s = lt.Series(example_dict)
+        s.index = reversed(example_index)
+        assert s.index == lt.Index(reversed(example_index))
+
     def test_reindex(self):
         s = lt.Series(example_dict)
         s.reindex(list(reversed(example_index)))  # Should not mutate
@@ -149,6 +154,14 @@ name: snake
         s = lt.Series(example_dict)
         with pytest.raises(ValueError, match="Length mismatch"):
             s.index = [*list(example_index), "more_indexes"]
+
+    def test_drop(self):
+        s = lt.Series(example_dict)
+        ps = pd.Series(example_dict)
+        for k in example_dict:
+            s = s.drop(k)
+            ps = ps.drop(k)
+            assert_series_equal_pandas(s, ps)
 
     def test_shape(self):
         s = lt.Series(example_dict)
@@ -218,6 +231,9 @@ class TestSeriesAccessors:
         mask_s = s > val
         mask_ps = ps > val
         assert_series_equal_pandas(s[mask_s], ps[mask_ps])
+        mask_s = (s > val).to_list()
+        mask_ps = (ps > val).tolist()
+        assert_series_equal_pandas(s[mask_s], ps[mask_ps])
 
     def test_getitem_series(self):
         s = lt.Series(example_dict)
@@ -242,6 +258,65 @@ class TestSeriesAccessors:
         ps[key] = 30
         assert_series_equal_pandas(s, ps)
 
+    def test_setitem_append(self):
+        s = lt.Series(example_dict)
+        ps = pd.Series(example_dict)
+        key = "new_key"
+        s[key] = 10
+        ps[key] = 10
+        assert_series_equal_pandas(s, ps)
+
+    def test_delitem_scalar(self):
+        s = lt.Series(example_dict)
+        ps = pd.Series(example_dict)
+        for k in example_dict:
+            del s[k]
+            del ps[k]
+            assert_series_equal_pandas(s, ps)
+
+    def test_delitem_collection(self):
+        # Pandas does not deletes indexing by slices or collections
+        s = lt.Series(example_dict)
+        keys = list(example_dict.keys())[:2]
+        del s[keys]
+        ans = example_dict.copy()
+        for k in keys:
+            del ans[k]
+        assert s.to_dict() == ans
+
+    def test_head(self):
+        s = lt.Series(example_dict)
+        ps = pd.Series(example_dict)
+        n = 2
+        assert_series_equal_pandas(s.head(n), ps.head(n))
+
+    def test_tail(self):
+        s = lt.Series(example_dict)
+        ps = pd.Series(example_dict)
+        n = 2
+        assert_series_equal_pandas(s.tail(n), ps.tail(n))
+
+    def test_find(self):
+        s = lt.Series(example_dict)
+        key = "a"
+        assert s.find(example_dict[key]) == key
+
+    def test_find_not_found(self):
+        s = lt.Series(example_dict)
+        assert s.find("value not found") is None
+
+    def test_ifind(self):
+        s = lt.Series(example_dict)
+        index = 0
+        key = list(example_index)[index]
+        assert s.ifind(example_dict[key]) == index
+
+    def test_ifind_not_found(self):
+        s = lt.Series(example_dict)
+        assert s.ifind("value not found") is None
+
+
+class TestSeriesLoc:
     def test_loc_getitem_scalar(self):
         s = lt.Series(example_dict)
         ps = pd.Series(example_dict)
@@ -251,6 +326,12 @@ class TestSeriesAccessors:
         assert s.loc[key] == ps.loc[key]
         key = "c"
         assert s.loc[key] == ps.loc[key]
+
+    def test_loc_getitem_scalar_error(self):
+        s = lt.Series(example_dict)
+        ps = pd.Series(example_dict)
+        key = "missing key"
+        assert_exception(lambda: ps.loc[key], lambda: s.loc[key], KeyError)
 
     def test_loc_setitem_scalar(self):
         s = lt.Series(example_dict)
@@ -307,7 +388,7 @@ class TestSeriesAccessors:
     def test_loc_setitem_series_error(self):
         s = lt.Series(example_dict)
         s_set = lt.Series([0, 1000], index=["a", "c"])
-        with pytest.raises(ValueError, match="Cannot set a single value with"):
+        with pytest.raises(ValueError, match="Length of assigned iterable must match the indexes length"):
             s.loc["a"] = s_set
 
     def test_loc_getitem_mask_series(self):
@@ -344,6 +425,8 @@ class TestSeriesAccessors:
         with pytest.raises(KeyError, match="Cannot index"):
             s.loc[{1, 2, 3}] = "no!"
 
+
+class TestsSeriesIloc:
     def test_iloc_getitem_scalar(self):
         s = lt.Series(example_dict)
         ps = pd.Series(example_dict)
@@ -402,6 +485,17 @@ class TestSeriesAccessors:
         ps.iloc[indexes] = value
         assert_series_equal_pandas(s, ps)
 
+    def test_iloc_setitem_mask_series(self):
+        s = lt.Series(example_dict)
+        ps = pd.Series(example_dict)
+        mask = [col == "a" for col in example_dict]
+        mask_s = lt.Series(mask, index=example_dict.keys())
+        mask_ps = pd.Series(mask, index=example_dict.keys())
+        value = 10
+        s.iloc[mask_s] = value
+        ps.iloc[mask_ps] = value
+        assert_series_equal_pandas(s, ps)
+
     def test_iloc_getitem_series(self):
         s = lt.Series(example_dict)
         ps = pd.Series(example_dict)
@@ -416,7 +510,8 @@ class TestSeriesAccessors:
         mask = [col == "a" for col in example_dict]
         mask_s = lt.Series(mask, index=example_dict.keys())
         mask_ps = pd.Series(mask, index=example_dict.keys())
-        assert_exception(lambda: ps.iloc[mask_ps], lambda: s.iloc[mask_s], ValueError)
+        # Pandas `iloc` is not working with boolean array Series
+        assert_series_equal_pandas(s.iloc[mask_s], ps.iloc[mask_ps.tolist()])
 
     def test_iloc_getitem_mask(self):
         s = lt.Series(example_dict)
@@ -424,46 +519,28 @@ class TestSeriesAccessors:
         mask = [col == "a" for col in example_dict]
         assert_series_equal_pandas(s.iloc[mask], ps.iloc[mask])
 
-    def test_iloc_get_error(self):
+    def test_iloc_setitem_series_with_series_values(self):
+        s = lt.Series(example_dict)
+        ps = pd.Series(example_dict)
+        idxs = [0, 1]
+        indexer_s = lt.Series(idxs)
+        indexer_ps = pd.Series(idxs)
+        value = [100, 200]
+        value_s = lt.Series(value)
+        value_ps = lt.Series(value)
+        s.iloc[indexer_s] = value_s
+        ps.iloc[indexer_ps] = value_ps
+        assert_series_equal_pandas(s, ps)
+
+    def test_iloc_get_not_hashable_key(self):
         s = lt.Series(example_dict)
         with pytest.raises(KeyError, match="Cannot index"):
             s.iloc[{1, 2, 3}]
 
-    def test_loc_set_error(self):
+    def test_iloc_set_not_hashable_key(self):
         s = lt.Series(example_dict)
         with pytest.raises(KeyError, match="Cannot index"):
-            s.loc[{1, 2, 3}] = "no!"
-
-    def test_head(self):
-        s = lt.Series(example_dict)
-        ps = pd.Series(example_dict)
-        n = 2
-        assert_series_equal_pandas(s.head(n), ps.head(n))
-
-    def test_tail(self):
-        s = lt.Series(example_dict)
-        ps = pd.Series(example_dict)
-        n = 2
-        assert_series_equal_pandas(s.tail(n), ps.tail(n))
-
-    def test_find(self):
-        s = lt.Series(example_dict)
-        key = "a"
-        assert s.find(example_dict[key]) == key
-
-    def test_find_not_found(self):
-        s = lt.Series(example_dict)
-        assert s.find("value not found") is None
-
-    def test_ifind(self):
-        s = lt.Series(example_dict)
-        index = 0
-        key = list(example_index)[index]
-        assert s.ifind(example_dict[key]) == index
-
-    def test_ifind_not_found(self):
-        s = lt.Series(example_dict)
-        assert s.ifind("value not found") is None
+            s.iloc[{1, 2, 3}] = "no!"
 
 
 class TestSeriesMapReduce:
@@ -768,6 +845,14 @@ class TestSeriesOperators:
         df = lt.Series()
         df += 10
         assert len(df) == 0
+
+    def test_op_misaligned_indexes(self):
+        sa = lt.Series(example_dict_a)
+        sb = lt.Series(example_dict_b)
+        sb["d"] = sb["b"]
+        sb = sb.drop("b")
+        with pytest.raises(ValueError, match="Indexes do not match"):
+            sa + sb
 
 
 class TestSeriesUnaryOperators:

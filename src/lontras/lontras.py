@@ -30,10 +30,6 @@ T = TypeVar("T", "Series", "DataFrame")
 DfMergeHow: TypeAlias = Literal["inner", "left", "right", "outer"]
 
 
-def _is_index_like(value: Any) -> TypeGuard[IndexLike]:
-    return isinstance(value, Sequence) and all(_is_scalar(v) for v in value)
-
-
 def _is_array_like(value: Any) -> TypeGuard[ArrayLike]:
     return isinstance(value, Collection) and not isinstance(value, DataFrame) and not _is_scalar(value)
 
@@ -69,7 +65,19 @@ class Array(UserList):
     # General methods
     ###########################################################################
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}({self.data})"
+        return f"{self.__class__.__name__}({self.data!s})"
+
+    def copy(self, *, deep: bool = True):
+        """
+        Creates a copy of the Array.
+
+        Args:
+            deep (bool, optional): If True, creates a deep copy. Otherwise, creates a shallow copy. Defaults to True.
+
+        Returns:
+            Array: A copy of the Array.
+        """
+        return copy.deepcopy(self) if deep else copy.copy(self)
 
     ###########################################################################
     # Accessors
@@ -96,9 +104,6 @@ class Array(UserList):
         indices: list[int]
         match key:
             case int():
-                if not _is_scalar(value):
-                    msg = f"Cannot set a single value with {type(value)}, only Scalars"
-                    raise ValueError(msg)
                 indices = [key]
             case slice():
                 indices = list(range(*key.indices(len(self.data))))
@@ -290,15 +295,15 @@ class Array(UserList):
     @staticmethod
     def _standardize_input(method):
         @functools.wraps(method)
-        def wrapper(self: Array, other: Array | ArrayLike | Scalar) -> Array:
+        def wrapper(self: Array, other: ArrayLike | Scalar) -> Array:
             match other:
                 case Array():
                     self._validate_length(other)
                 case o if _is_array_like(o):
                     other = Array(o)
                     self._validate_length(other)
-                case o if _is_scalar(o):
-                    other = Array.full(len(self), o)
+                case _ as o:
+                    other = Array.full(len(self), o)  # type: ignore  # We let any type in
             return method(self, other)  # Call the actual method with standardized input
 
         return wrapper
@@ -820,7 +825,7 @@ class Index(Array):
     _rev_index: dict[Scalar, list[int]]
     __slots__ = ("name", "_rev_index")
 
-    def __init__(self, data: Index | ArrayLike, name: Scalar | None = None):
+    def __init__(self, data: Index | ArrayLike | Iterator, name: Scalar | None = None):
         self.name = name
         if isinstance(data, Index):
             super().__init__(data.data)
@@ -828,8 +833,9 @@ class Index(Array):
                 self.name = data.name
         else:
             super().__init__(data)
+
         _rev_index = defaultdict(list)
-        for i, d in enumerate(data):
+        for i, d in enumerate(self.data):
             _rev_index[d].append(i)
         self._rev_index = dict(_rev_index)
 
@@ -840,14 +846,13 @@ class Index(Array):
             case name:
                 return f'{self.__class__.__name__}({self.data}, name="{name!s}")'
 
-    def __eq__(self, other: Index | IndexLike) -> bool:  # type: ignore
-        match other:
-            case Index():
-                return self.data == other.data
-            case o if _is_index_like(o):
-                return self.data == Index(other).data
-            case _:
-                return False
+    def __setitem__(self, *_args, **_kwargs):
+        msg = "Index does not support mutable operations"
+        raise TypeError(msg)
+
+    def __delitem__(self, *_args, **_kwargs):
+        msg = "Index does not support mutable operations"
+        raise TypeError(msg)
 
     @property
     def values(self) -> list[Any]:
@@ -858,18 +863,6 @@ class Index(Array):
             list: The values of the Index.
         """
         return self.data
-
-    def copy(self, *, deep: bool = True):
-        """
-        Creates a copy of the Index.
-
-        Args:
-            deep (bool, optional): If True, creates a deep copy. Otherwise, creates a shallow copy. Defaults to True.
-
-        Returns:
-            Index: A copy of the Index.
-        """
-        return copy.deepcopy(self) if deep else copy.copy(self)
 
     def get_ilocs(self, key: LocIndexes) -> int | list[int]:
         match key:
@@ -904,11 +897,24 @@ class BaseIndexer(Generic[T]):
 
 
 class LocSeriesIndexer(BaseIndexer["Series"]):
-    def __getitem__(self, key: LocIndexes) -> Any | Series:
+    def __getitem__(self, key: LocIndexes) -> Scalar | Series:
         return self.data.iloc[self.index.get_ilocs(key)]
 
     def __setitem__(self, key: LocIndexes, value: Scalar | ArrayLike | Mapping | Series):
-        self.data.iloc[self.index.get_ilocs(key)] = value
+        if _is_scalar(key) and key not in self.index:
+            self.data._inplace_append({key: value})  # noqa: SLF001
+        else:
+            self.data.iloc[self.index.get_ilocs(key)] = value
+
+    def __delitem__(self, key: LocIndexes):
+        idxs = self.index.get_ilocs(key)
+        ilocs: list[int] = [idxs] if isinstance(idxs, int) else idxs
+        new_data = list(self.data.values)
+        new_index = list(self.data.index)
+        for iloc in sorted(ilocs, reverse=True):
+            del new_data[iloc]
+            del new_index[iloc]
+        self.data._copy_from(Series(new_data, index=new_index, name=self.data.name))  # noqa: SLF001
 
 
 class IlocSeriesIndexer(BaseIndexer["Series"]):
@@ -918,9 +924,6 @@ class IlocSeriesIndexer(BaseIndexer["Series"]):
     def __getitem__(self, key: list[int] | slice | Series) -> Series: ...  # no cov
     def __getitem__(self, key: IlocIndexes) -> Scalar | Series:
         if isinstance(key, Series):
-            if _is_boolean_mask(key):
-                msg = "iLocation based boolean indexing cannot use an indexable as a mask"
-                raise ValueError(msg)
             key = key.values
         match key:
             case Array() | list() | slice():
@@ -933,9 +936,6 @@ class IlocSeriesIndexer(BaseIndexer["Series"]):
 
     def __setitem__(self, key: IlocIndexes, value: Scalar | ArrayLike | Mapping | Series):
         if isinstance(key, Series):
-            if _is_boolean_mask(key):
-                msg = "iLocation based boolean indexing cannot use an indexable as a mask"
-                raise ValueError(msg)
             key = key.values
         match value:
             case Series():
@@ -944,12 +944,10 @@ class IlocSeriesIndexer(BaseIndexer["Series"]):
                 value = list(value.values())
 
         match key:
-            case Series():
-                self.data.values[key.values] = value
-            case list() | slice():
-                self.data.values[key] = value
+            case Array() | list() | slice() as k:
+                self.data.values[k] = value
             case k if _is_scalar(k):
-                self.data.values[key] = value
+                self.data.values[k] = value
             case _:
                 msg = f"Cannot index with: {key=}"
                 raise KeyError(msg)
@@ -1251,6 +1249,20 @@ class Series(Sequence, Sized):
         clone.index = index
         return clone
 
+    def drop(self, indexes: LocIndexes) -> Series:
+        """
+        Removes the elements associated to `labels` and returns a new Series.
+
+        Args:
+            indexes (LocIndexes): Labels to remove
+
+        Returns:
+            Series: A new series with the removed values
+        """
+        clone = self.copy(deep=True)
+        del clone[indexes]
+        return clone
+
     @property
     def values(self) -> Array:  # type: ignore
         """
@@ -1263,6 +1275,9 @@ class Series(Sequence, Sized):
 
     @property
     def shape(self) -> tuple[int,]:
+        """
+        Return a tuple of the shape of the underlying data.
+        """
         return (len(self.index),)
 
     ###########################################################################
@@ -1289,6 +1304,15 @@ class Series(Sequence, Sized):
             value (Scalar | ArrayLike | Mapping | Series): The value or values to set
         """
         self.loc[key] = value
+
+    def __delitem__(self, key: LocIndexes):
+        """
+        Deletes an item or slice from the Series
+
+        Args:
+            key (LocIndexes): The key, list of keys, or slice to delete.
+        """
+        del self.loc[key]
 
     def head(self, n: int = 5) -> Series:
         """
@@ -1352,6 +1376,31 @@ class Series(Sequence, Sized):
     ###########################################################################
     # Merge/Concatenate
     ###########################################################################
+    def _copy_from(self, other: Series):
+        self._data = other.values.copy()
+        self._index = other.index.copy()
+        self._set_indexers()
+
+    def _inplace_append(self, other: Series | Mapping):
+        new_series: Series
+        match other:
+            case Series():
+                duplicate_index = set(self.index) & set(other.index)
+                if len(duplicate_index) > 0:
+                    msg = f"Cannot append with duplicate indexes: {duplicate_index}"
+                    raise ValueError(msg)
+                new_series = Series(self.to_dict() | other.to_dict(), name=self.name)
+            case Mapping():
+                duplicate_index = set(self.index) & set(other.keys())
+                if len(duplicate_index) > 0:
+                    msg = f"Cannot append with duplicate indexes: {duplicate_index}"
+                    raise ValueError(msg)
+                new_series = Series(self.to_dict() | dict(other), name=self.name)
+            case _:
+                msg = f"Cannot append with: {other=}"
+                raise ValueError(msg)
+        self._copy_from(new_series)
+
     def append(self, other: Series | Mapping) -> Series:
         """
         Appends `other` to the end of the Series
@@ -1363,29 +1412,16 @@ class Series(Sequence, Sized):
             Series: A new Series with new data
         """
         # @TODO: Should we support ArrayLike too?
-        match other:
-            case Series():
-                duplicate_index = set(self.index) & set(other.index)
-                if len(duplicate_index) > 0:
-                    msg = f"Cannot append with duplicate indexes: {duplicate_index}"
-                    raise ValueError(msg)
-                return Series(self.to_dict() | other.to_dict())
-            case Mapping():
-                duplicate_index = set(self.index) & set(other.keys())
-                if len(duplicate_index) > 0:
-                    msg = f"Cannot append with duplicate indexes: {duplicate_index}"
-                    raise ValueError(msg)
-                return Series(self.to_dict() | dict(other))
-            case _:
-                msg = f"Cannot append with: {other=}"
-                raise ValueError(msg)
+        clone = self.copy(deep=True)
+        clone._inplace_append(other)  # noqa: SLF001
+        return clone
 
     ###########################################################################
     # Auxiliary Functions
     ###########################################################################
     def _index_matches(self, index: Index):
         if set(self.index) != set(index):
-            msg = "Index doesn't match"
+            msg = "Indexes do not match"
             raise ValueError(msg)
 
     @staticmethod
@@ -1397,10 +1433,10 @@ class Series(Sequence, Sized):
                     self._validate_length(other)
                     self._index_matches(other.index)
                 case o if _is_array_like(o):
-                    other = Series(o, index=self.index)
+                    other = Series(o, index=self.index, name=self.name)
                     self._validate_length(other)
-                case o if _is_scalar(o):
-                    other = Series(Array.full(len(self), o), index=self.index)
+                case _ as o:
+                    other = Series(Array.full(len(self), o), index=self.index, name=self.name)  # type: ignore  # We let any type in
             return method(self, other)
 
         return wrapper

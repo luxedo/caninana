@@ -48,6 +48,24 @@ class TestArrayInit:
             na = np.ones(i)
             assert_array_equal_numpy(a, na)
 
+    def test__repr__(self):
+        a = lt.Array()
+        assert str(a) == "Array([])"
+        a = lt.Array(example_values)
+        assert str(a) == f"Array({example_values!s})"
+
+    def test_shallow_copy(self):
+        a = lt.Array([[123]])
+        t = a.copy(deep=False)
+        a[0][0] = 456
+        assert (a == t).all()
+
+    def test_deepcopy(self):
+        a = lt.Array([[123]])
+        t = a.copy(deep=True)
+        a[0][0] = 456
+        assert (a != t).all()
+
 
 class TestArrayGetitem:
     def test_getitem_int(self):
@@ -81,6 +99,11 @@ class TestArrayGetitem:
         for mask in product([True, False], repeat=n):
             indexes = list(mask)
             assert_array_equal_numpy(a[indexes], na[indexes])
+
+    def test_getitem_error(self):
+        a = lt.Array(example_values)
+        with pytest.raises(KeyError, match="Cannot index with: key="):
+            a["abc"]
 
 
 class TestArraySetitem:
@@ -163,20 +186,51 @@ class TestArraySetitem:
             na[indexes] = set_values
             assert_array_equal_numpy(a, na)
 
+    def test_setitem_key_error(self):
+        a = lt.Array(example_values)
+        with pytest.raises(KeyError, match="Cannot index with: key="):
+            a["abc"] = 10
 
-class TestArrayErrors:
+    def test_setitem_value_error(self):
+        a = lt.Array(example_values)
+        with pytest.raises(TypeError, match="Cannot set with: value="):
+            a[0] = int
+
     def test_setitem_invalid_type(self):
         a = lt.Array([1, 2, 3])
         with pytest.raises(KeyError, match="Cannot index with:"):
             a["invalid_index"] = 5
 
 
+class TestArrayConcatenation:
+    def test_append(self):
+        a = lt.Array()
+        i = []
+        a.append(10)
+        i.append(10)
+        assert (a == i).all()
+
+    def test_append_return(self):
+        a = lt.Array()
+        i = []
+        b = a.append(10)
+        i.append(10)
+        assert (a == b).all()
+        assert (a == i).all()
+
+
 class TestArrayMapReduce:
     def test_map(self):
-        pass
+        a = lt.Array(example_values)
+        assert a.map(lambda x: x**2) == [v**2 for v in example_values]
 
     def test_reduce(self):
-        pass
+        a = lt.Array(example_values)
+        assert a.reduce(lambda acc, cur: acc + cur, 0) == sum(example_values)
+
+    def test_reduce_zero_length(self):
+        a = lt.Array()
+        assert a.reduce(lambda *_: 10, "did nothing") == "did nothing"
 
     @pytest.mark.parametrize(
         "func",
@@ -194,14 +248,26 @@ class TestArrayMapReduce:
         assert getattr(a, func)() == getattr(na, func)()
 
     def test_argmax(self):
-        a = lt.Array(example_values)
-        na = np.array(example_values)
+        m = [0, 10, 20, 0]
+        a = lt.Array(m)
+        na = np.array(m)
         assert a.argmax() == na.argmax()
 
+    def test_argmin_error(self):
+        a = lt.Array()
+        with pytest.raises(ValueError, match="Cannot get argmin of an empty Array"):
+            a.argmin()
+
     def test_argmin(self):
-        a = lt.Array(example_values)
-        na = np.array(example_values)
+        m = [0, 10, 20, 0]
+        a = lt.Array(m)
+        na = np.array(m)
         assert a.argmin() == na.argmin()
+
+    def test_argmax_error(self):
+        a = lt.Array()
+        with pytest.raises(ValueError, match="Cannot get argmax of an empty Array"):
+            a.argmax()
 
 
 class TestArrayComparisons:
@@ -270,6 +336,12 @@ class TestArrayOperators:
         # Right hand operator
         assert ((example_values_b @ aa) == int(example_values_b @ naa)) is True
 
+    def test_matmul_misaligned_error(self):
+        aa = lt.Array(example_values_a)
+        ab = lt.Array([*example_values_b, 1])
+        with pytest.raises(ValueError, match="Cannot operate Arrays with different sizes:"):
+            aa @ ab
+
     @pytest.mark.parametrize(
         "op",
         [
@@ -279,6 +351,10 @@ class TestArrayOperators:
             "__rand__",
             "__rxor__",
             "__ror__",
+            "__rshift__",
+            "__lshift__",
+            "__rrshift__",
+            "__rlshift__",
         ],
     )
     def test_bop(self, op):
@@ -318,20 +394,31 @@ class TestArrayOperators:
         getattr(naa, iop)(nab)
         assert_array_equal_numpy(aa, naa)
 
-    @pytest.mark.parametrize(
-        "iop",
-        [
-            "__itruediv__",
-        ],
-    )
-    def test_op_inplace_float(self, iop):
+    def test_op_inplace_truediv(self):
         aa = lt.Array(example_values_a)
         ab = lt.Array(example_values_b)
         naa = np.array(example_values_a, dtype=float)
         nab = np.array(example_values_b)
-        getattr(aa, iop)(ab)
-        getattr(naa, iop)(nab)
+        aa /= ab
+        naa /= nab
         assert_array_equal_numpy(aa, naa)
+
+    def test_op_divmod(self):
+        aa = lt.Array(example_values_a)
+        ab = lt.Array(example_values_b)
+        d = divmod(aa, ab)
+        assert isinstance(d, lt.Array)
+        # Numpy expands the dimension of the vector to a matrix. We're just storing the tuples in the vector
+        for i, row in enumerate(d):
+            assert row == divmod(example_values_a[i], example_values_b[i])
+
+    def test_op_rdivmod(self):
+        value = 10
+        aa = lt.Array(example_values_a)
+        d = divmod(value, aa)
+        assert isinstance(d, lt.Array)
+        for i, row in enumerate(d):
+            assert row == divmod(value, example_values_a[i])
 
     def test_iop_matmul(self):
         aa = lt.Array(example_values_a)
