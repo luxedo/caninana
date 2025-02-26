@@ -2559,7 +2559,7 @@ class DataFrame:
             case DataFrame():
                 if list(self.columns) != list(other.index):
                     raise ValueError(not_aligned_msg)
-                df_data = [[s_a.dot(s_b) for s_b in other.values] for s_a in self.T.values]
+                df_data = [[s_a.dot(s_b) for s_b in other.T.values] for s_a in self.values]
                 return DataFrame(df_data, index=self.index, columns=other.columns)
             case Series() | ArrayLike():
                 if len(self.columns) != len(other):
@@ -2568,7 +2568,7 @@ class DataFrame:
                     other = Series(other, index=self.columns)
                 if list(self.columns) != list(other.index):
                     raise ValueError(not_aligned_msg)
-                s_data = [sa.dot(other) for sa in self.T.values]
+                s_data = [sa.dot(other) for sa in self.values]
                 return Series(s_data, index=self.index, name=other.name)
             case _:
                 msg = "Dot product requires other to be a DataFrame or Series."
@@ -3237,7 +3237,7 @@ class DataFrame:
             msg = f"shapes {Series(other).shape} and {self.shape} not aligned"
             raise ValueError(msg)
         other = Series(other, index=self.index)
-        data = [other.dot(s_a) for s_a in self.values]
+        data = [other.dot(s_a) for s_a in self.T.values]
         return Series(data, index=self.columns, name=other.name)
 
     def __rtruediv__(self, other: DataFrame | Series | ArrayLike | Scalar) -> DataFrame:

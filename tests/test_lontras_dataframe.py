@@ -831,7 +831,7 @@ class TestDataFrameComparisons:
     #     # We're keeping it empty
     #     df = lt.DataFrame() == [[]]
     #     pdf = pd.DataFrame() == [[]]
-    #     assert_dataframe_equal_pandas(df, )
+    #     assert_dataframe_equal_pandas(df, pdf)
 
     def test_eq_empty_empty_mapping(self):
         df = lt.DataFrame() == {}
@@ -999,64 +999,64 @@ class TestDataFrameOperators:
             )
         ).all(axis=None)
 
-    #     def test_matmul(self):
-    #         dfa = lt.DataFrame(example_op_a)
-    #         pdfa = pd.DataFrame(example_op_a)
+    def test_matmul(self):
+        dfa = lt.DataFrame(example_op_a)
+        pdfa = pd.DataFrame(example_op_a)
 
-    #         # DataFrame
-    #         dfb = lt.DataFrame(example_op_b).T
-    #         pdfb = pd.DataFrame(example_op_b).T
-    #         assert_dataframe_equal_pandas(dfa @ dfb, pdfa @ pdfb)
+        # DataFrame
+        dfb = lt.DataFrame(example_op_b).T
+        pdfb = pd.DataFrame(example_op_b).T
+        assert_dataframe_equal_pandas(dfa @ dfb, pdfa @ pdfb)
 
-    #         # Series
-    #         sb = lt.Series(example_op_collection)
-    #         psb = pd.Series(example_op_collection)
-    #         assert_series_equal_pandas(dfa @ sb, pdfa @ psb)
+        # Series
+        sb = lt.Series(example_op_collection)
+        psb = pd.Series(example_op_collection)
+        assert_series_equal_pandas(dfa @ sb, pdfa @ psb)
 
-    #         # Collection
-    #         assert_series_equal_pandas(dfa @ example_op_collection, pdfa @ example_op_collection)
+        # Collection
+        assert_series_equal_pandas(dfa @ example_op_collection, pdfa @ example_op_collection)
 
-    #     def test_rop_matmul(self):
-    #         dfa = lt.DataFrame(example_op_a)
-    #         pdfa = pd.DataFrame(example_op_a)
+    def test_rop_matmul(self):
+        dfa = lt.DataFrame(example_op_a)
+        pdfa = pd.DataFrame(example_op_a)
 
-    #         # Right hand operator
-    #         assert_series_equal_pandas(example_op_collection @ dfa.T, example_op_collection @ pdfa.T)
+        # Right hand operator
+        assert_series_equal_pandas(example_op_collection @ dfa.T, example_op_collection @ pdfa.T)
 
-    #     def test_misaligned_dataframe_matmul(self):
-    #         dfa = lt.DataFrame(example_op_a)
-    #         dfb = lt.DataFrame(example_op_b)
-    #         pdfa = pd.DataFrame(example_op_a)
-    #         pdfb = pd.DataFrame(example_op_a)
-    #         assert_exception(lambda: pdfa @ pdfb, lambda: dfa @ dfb, ValueError)
+    def test_misaligned_dataframe_matmul(self):
+        dfa = lt.DataFrame(example_op_a)
+        dfb = lt.DataFrame(example_op_b)
+        pdfa = pd.DataFrame(example_op_a)
+        pdfb = pd.DataFrame(example_op_a)
+        assert_exception(lambda: pdfa @ pdfb, lambda: dfa @ dfb, ValueError)
 
-    #     def test_misaligned_series_matmul(self):
-    #         dfa = lt.DataFrame(example_op_a)
-    #         sb = lt.Series([*example_op_collection, "Misalign"])
-    #         pdfa = pd.DataFrame(example_op_a)
-    #         psb = pd.Series([*example_op_collection, "Misalign"])
-    #         assert_exception(lambda: pdfa @ psb, lambda: dfa @ sb, ValueError)
+    def test_misaligned_series_matmul(self):
+        dfa = lt.DataFrame(example_op_a)
+        sb = lt.Series([*example_op_collection, "Misalign"])
+        pdfa = pd.DataFrame(example_op_a)
+        psb = pd.Series([*example_op_collection, "Misalign"])
+        assert_exception(lambda: pdfa @ psb, lambda: dfa @ sb, ValueError)
 
-    #     def test_misaligned_collection_rmatmul(self):
-    #         dfa = lt.DataFrame(example_op_a)
-    #         cb = [*example_op_collection, "Misalign"]
-    #         pdfa = pd.DataFrame(example_op_a)
-    #         pcb = [*example_op_collection, "Misalign"]
-    #         assert_exception(lambda: pcb @ pdfa, lambda: cb @ dfa, ValueError)
+    def test_misaligned_collection_rmatmul(self):
+        dfa = lt.DataFrame(example_op_a)
+        cb = [*example_op_collection, "Misalign"]
+        pdfa = pd.DataFrame(example_op_a)
+        pcb = [*example_op_collection, "Misalign"]
+        assert_exception(lambda: pcb @ pdfa, lambda: cb @ dfa, ValueError)
 
-    #     def test_mislabeled_series_matmul(self):
-    #         dfa = lt.DataFrame(example_op_a)
-    #         sb = lt.Series(example_op_collection)
-    #         sb.index = [3, 4, 5, 6, 7]
-    #         pdfa = pd.DataFrame(example_op_a)
-    #         psb = pd.Series(example_op_collection)
-    #         psb.index = [3, 4, 5, 6, 7]
-    #         assert_exception(lambda: pdfa @ psb, lambda: dfa @ sb, ValueError)
+    def test_mislabeled_series_matmul(self):
+        dfa = lt.DataFrame(example_op_a)
+        sb = lt.Series(example_op_collection)
+        sb.index = [3, 4, 5, 6, 7]
+        pdfa = pd.DataFrame(example_op_a)
+        psb = pd.Series(example_op_collection)
+        psb.index = [3, 4, 5, 6, 7]
+        assert_exception(lambda: pdfa @ psb, lambda: dfa @ sb, ValueError)
 
-    #     def test_matmul_wrong_type_error(self):
-    #         dfa = lt.DataFrame(example_op_a)
-    #         with pytest.raises(TypeError, match="Dot product requires other to be a DataFrame or Series"):
-    #             dfa @ int
+    def test_matmul_wrong_type_error(self):
+        dfa = lt.DataFrame(example_op_a)
+        with pytest.raises(TypeError, match="Dot product requires other to be a DataFrame or Series"):
+            dfa @ int
 
     @pytest.mark.parametrize(
         "op",
