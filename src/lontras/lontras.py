@@ -3361,13 +3361,13 @@ class DataFrame:
     # Unary Operators
     ###########################################################################
     def __neg__(self) -> DataFrame:
-        return DataFrame([-s for s in self.iterrows()], index=self.index, columns=self.columns)  # type: ignore
+        return DataFrame([-s for s in self.values], index=self.index, columns=self.columns)  # type: ignore
 
     def __pos__(self) -> DataFrame:
-        return DataFrame([+s for s in self.iterrows()], index=self.index, columns=self.columns)  # type: ignore
+        return DataFrame([+s for s in self.values], index=self.index, columns=self.columns)  # type: ignore
 
     def __abs__(self) -> DataFrame:
         return self.abs()
 
     def __invert__(self) -> DataFrame:
-        return DataFrame([~s for s in self.iterrows()], index=self.index, columns=self.columns)  # type: ignore
+        return DataFrame([~s for s in self.values], index=self.index, columns=self.columns)  # type: ignore

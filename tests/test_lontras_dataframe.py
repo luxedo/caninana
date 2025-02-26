@@ -1326,23 +1326,23 @@ class TestDataFrameOperators:
 #             dfa += [*example_op_collection, "No!"]
 
 
-# class TestDataFrameUnaryOperators:
-#     def test_neg(self):
-#         df = lt.DataFrame(example_unary)
-#         pdf = pd.DataFrame(example_unary)
-#         assert_dataframe_equal_pandas(-df, -pdf)
+class TestDataFrameUnaryOperators:
+    def test_neg(self):
+        df = lt.DataFrame(example_unary)
+        pdf = pd.DataFrame(example_unary)
+        assert_dataframe_equal_pandas(-df, -pdf)
 
-#     def test_pos(self):
-#         df = lt.DataFrame(example_unary)
-#         pdf = pd.DataFrame(example_unary)
-#         assert_dataframe_equal_pandas(+df, +pdf)
+    def test_pos(self):
+        df = lt.DataFrame(example_unary)
+        pdf = pd.DataFrame(example_unary)
+        assert_dataframe_equal_pandas(+df, +pdf)
 
-#     def test_abs(self):
-#         df = lt.DataFrame(example_unary)
-#         pdf = pd.DataFrame(example_unary)
-#         assert_dataframe_equal_pandas(abs(df), abs(pdf))
+    def test_abs(self):
+        df = lt.DataFrame(example_unary)
+        pdf = pd.DataFrame(example_unary)
+        assert_dataframe_equal_pandas(abs(df), abs(pdf))
 
-#     def test_invert(self):
-#         df = lt.DataFrame(example_unary)
-#         pdf = pd.DataFrame(example_unary)
-#         assert_dataframe_equal_pandas(~df, ~pdf)
+    def test_invert(self):
+        df = lt.DataFrame(example_unary)
+        pdf = pd.DataFrame(example_unary)
+        assert_dataframe_equal_pandas(~df, ~pdf)
