@@ -207,6 +207,12 @@ class TestSeriesAccessors:
         indexes = ["a", "c"]
         assert_series_equal_pandas(s[indexes], ps[indexes])
 
+    def test_getitem_empty_collection(self):
+        s = lt.Series(example_dict)
+        ps = pd.Series(example_dict)
+        indexes = []
+        assert_series_equal_pandas(s[indexes], ps[indexes])
+
     def test_getitem_slice(self):
         s = lt.Series(example_dict)
         ps = pd.Series(example_dict)

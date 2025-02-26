@@ -11,6 +11,7 @@ import pandas as pd
 import pytest
 
 import lontras as lt
+from lontras.lontras import _is_scalar
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -32,14 +33,14 @@ def assert_array_equal_numpy(a: lt.Array, na: np.ndarray):
     assert (a == na).all()
 
 
-# def assert_dataframe_equal_pandas(df: lt.DataFrame, pdf: pd.DataFrame):
-#     assert isinstance(s, lt.DataFrame)
-#     assert isinstance(ps, pd.DataFrame)
-#     assert df.shape == pdf.shape
-#     assert all(df.columns == pdf.columns) is True  # type: ignore
-#     assert all(df.index == pdf.index) is True  # type: ignore
-#     for col in df.columns:
-#         assert_series_equal_pandas(df[col], pdf[col])
+def assert_dataframe_equal_pandas(df: lt.DataFrame, pdf: pd.DataFrame):
+    assert isinstance(df, lt.DataFrame)
+    assert isinstance(pdf, pd.DataFrame)
+    assert df.shape == pdf.shape
+    assert all(df.columns == pdf.columns) is True  # type: ignore
+    assert all(df.index == pdf.index) is True  # type: ignore
+    for col in df.columns:
+        assert_series_equal_pandas(df[col], pdf[col])
 
 
 def assert_series_equal_pandas(s: lt.Series, ps: pd.Series):
@@ -58,7 +59,7 @@ def assert_index_equal_pandas(i: lt.Index, pi: pd.Index):
     assert (i.values == pi.values.tolist()) is True
 
 
-# def assert_scalar_equal(v0, v1):
-#     assert _is_scalar(v0)
-#     assert _is_scalar(v1)
-#     assert v0 == v1
+def assert_scalar_equal(v0, v1):
+    assert _is_scalar(v0)
+    assert _is_scalar(v1)
+    assert v0 == v1
