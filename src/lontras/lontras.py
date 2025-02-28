@@ -3296,20 +3296,20 @@ class DataFrame:
         if len(self.columns) != len(other):
             msg = "Operands are not aligned. Do `left, right = left.align(right, axis=1, copy=False)` before operating."
             raise ValueError(msg)
-        for col, s in self.iterrows():
-            getattr(s, op)(other[col])
+        for s in self.values:
+            getattr(s, op)(other)
         return self
 
     def _iop_dataframe(self, op: str, other: DataFrame) -> Self:
         if set(self.columns) != set(other.columns) or self.shape != other.shape:
             msg = "Can only compare identically-labeled (both index and columns) DataFrame objects"
             raise ValueError(msg)
-        for col, s in self.iterrows():
-            getattr(s, op)(other[col])
+        for s, o in zip(self.values, other.values):
+            getattr(s, op)(o)
         return self
 
     def _iop_scalar(self, op: str, other: ArrayLike[Any] | Scalar) -> Self:
-        for _, s in self.iterrows():
+        for s in self.values:
             getattr(s, op)(other)
         return self
 
