@@ -2478,39 +2478,39 @@ class DataFrame:
             case _:
                 return self.apply(method, axis)
 
-    #     def agg(self, method: Callable[[ArrayLike[Any]], Any], axis: Axis = 0) -> Series:
-    #         """
-    #         Aggregate data along specified axis using one or more operations.
+    def agg(self, method: Callable[[ArrayLike[Any]], Any], axis: Axis = 0) -> Series:
+        """
+        Aggregate data along specified axis using one or more operations.
 
-    #         Applies aggregation function to raw array values (rather than Series objects)
-    #         along columns (axis=0) or rows (axis=1). Optimized for numerical aggregations.
+        Applies aggregation function to raw array values (rather than Series objects)
+        along columns (axis=0) or rows (axis=1). Optimized for numerical aggregations.
 
-    #         Args:
-    #             method: Callable that takes array-like data and returns scalar
-    #                 - For axis=0: Receives column values as array
-    #                 - For axis=1: Receives row values as array
-    #             axis: Axis to aggregate along:
-    #                 - 0: Aggregate each column (default)
-    #                 - 1: Aggregate each row
+        Args:
+            method: Callable that takes array-like data and returns scalar
+                - For axis=0: Receives column values as array
+                - For axis=1: Receives row values as array
+            axis: Axis to aggregate along:
+                - 0: Aggregate each column (default)
+                - 1: Aggregate each row
 
-    #         Returns:
-    #             Series: Aggregation results.
-    #         """
-    #         self._validate_axis(axis)
-    #         match axis:
-    #             case int(c) if c == AxisRows:
-    #                 return Series({col: method(s.values) for col, s in self.items()})
-    #             case int(c) if c == AxisCols:
-    #                 return self.T.agg(method, axis=0)
-    #             case unreachable:  # no cov
-    #                 assert_never(unreachable)  # type: ignore # @TODO: How to exhaust this check?
+        Returns:
+            Series: Aggregation results.
+        """
+        self._validate_axis(axis)
+        match axis:
+            case int(c) if c == AxisRows:
+                return self.T.agg(method, axis=1)
+            case int(c) if c == AxisCols:
+                return Series({col: method(s) for col, s in self.iterrows()})
+            case unreachable:  # no cov
+                assert_never(unreachable)  # type: ignore # @TODO: How to exhaust this check?
 
-    #     def _agg_with_none(self, method: Callable[[ArrayLike[Any]], Any], axis: AxisOrNone = 0):
-    #         match axis:
-    #             case None:
-    #                 return method([item for sublist in self.to_list() for item in sublist])
-    #             case _:
-    #                 return self.agg(method, axis)
+    def _agg_with_none(self, method: Callable[[ArrayLike[Any]], Any], axis: AxisOrNone = 0):
+        match axis:
+            case None:
+                return method([item for sublist in self.values for item in sublist])
+            case _:
+                return self.agg(method, axis)
 
     def map(self, func: Callable) -> DataFrame:
         """
@@ -2768,110 +2768,110 @@ class DataFrame:
     #     ) -> DataFrame:
     #         return merge(self, right, how, on, left_on=left_on, right_on=right_on, left_index=left_index, right_index=right_index, suffixes=suffixes)
 
-    #     ###########################################################################
-    #     # Statistics
-    #     ###########################################################################
-    #     @overload
-    #     def mean(self, axis: Axis) -> Series: ...  # no cov
-    #     @overload
-    #     def mean(self, axis: None) -> Scalar: ...  # no cov
-    #     def mean(self, axis: AxisOrNone = 0) -> Series | Scalar:
-    #         """
-    #         Computes the mean of the Series.
+    ###########################################################################
+    # Statistics
+    ###########################################################################
+    @overload
+    def mean(self, axis: Axis) -> Series: ...  # no cov
+    @overload
+    def mean(self, axis: None) -> Scalar: ...  # no cov
+    def mean(self, axis: AxisOrNone = 0) -> Series | Scalar:
+        """
+        Computes the mean of the Series.
 
-    #         Args:
-    #             axis: AxisOrNone to aggregate along:
-    #                 - 0: Aggregate each column (default)
-    #                 - 1: Aggregate each row
-    #                 - None: Aggregates along both axes returning a scalar
+        Args:
+            axis: AxisOrNone to aggregate along:
+                - 0: Aggregate each column (default)
+                - 1: Aggregate each row
+                - None: Aggregates along both axes returning a scalar
 
-    #         Returns:
-    #             Series | float: Axis mean
-    #         """
-    #         return self._agg_with_none(statistics.mean, axis=axis)
+        Returns:
+            Series | float: Axis mean
+        """
+        return self._agg_with_none(statistics.mean, axis=axis)
 
-    #     @overload
-    #     def median(self, axis: Axis) -> Series: ...  # no cov
-    #     @overload
-    #     def median(self, axis: None) -> Scalar: ...  # no cov
-    #     def median(self, axis: AxisOrNone = 0) -> Series | Scalar:
-    #         """
-    #         Return the median (middle value) of numeric data, using the common “mean of middle two” method.
-    #         If data is empty, StatisticsError is raised. data can be a sequence or iterable.
+    @overload
+    def median(self, axis: Axis) -> Series: ...  # no cov
+    @overload
+    def median(self, axis: None) -> Scalar: ...  # no cov
+    def median(self, axis: AxisOrNone = 0) -> Series | Scalar:
+        """
+        Return the median (middle value) of numeric data, using the common “mean of middle two” method.
+        If data is empty, StatisticsError is raised. data can be a sequence or iterable.
 
-    #         Args:
-    #             axis: AxisOrNone to aggregate along:
-    #                 - 0: Aggregate each column (default)
-    #                 - 1: Aggregate each row
-    #                 - None: Aggregates along both axes returning a scalar
+        Args:
+            axis: AxisOrNone to aggregate along:
+                - 0: Aggregate each column (default)
+                - 1: Aggregate each row
+                - None: Aggregates along both axes returning a scalar
 
-    #         Returns:
-    #             Series | float | int: Axis median
-    #         """
-    #         return self._agg_with_none(statistics.median, axis=axis)
+        Returns:
+            Series | float | int: Axis median
+        """
+        return self._agg_with_none(statistics.median, axis=axis)
 
-    #     def mode(self, axis: Axis = 0) -> Series:
-    #         """
-    #         Return the single most common data point from discrete or nominal data. The mode (when it exists)
-    #         is the most typical value and serves as a measure of central location.
+    def mode(self, axis: Axis = 0) -> Series:
+        """
+        Return the single most common data point from discrete or nominal data. The mode (when it exists)
+        is the most typical value and serves as a measure of central location.
 
-    #         Args:
-    #             axis: Axis to aggregate along:
-    #                 - 0: Aggregate each column (default)
-    #                 - 1: Aggregate each row
+        Args:
+            axis: Axis to aggregate along:
+                - 0: Aggregate each column (default)
+                - 1: Aggregate each row
 
-    #         Returns:
-    #             Series: Axis mode
-    #         """
-    #         # @TOOO: Improve this. Might have to implement NaNs
-    #         return self.agg(statistics.mode, axis=axis)
+        Returns:
+            Series: Axis mode
+        """
+        # @TOOO: Improve this. Might have to implement NaNs
+        return self.agg(statistics.mode, axis=axis)
 
-    #     def quantiles(self, *, n=4, method: Literal["exclusive", "inclusive"] = "exclusive", axis: Axis = 0) -> Series:
-    #         """
-    #         Divide data into n continuous intervals with equal probability. Returns a list of `n - 1`
-    #         cut points separating the intervals.
+    def quantiles(self, *, n=4, method: Literal["exclusive", "inclusive"] = "exclusive", axis: Axis = 0) -> Series:
+        """
+        Divide data into n continuous intervals with equal probability. Returns a list of `n - 1`
+        cut points separating the intervals.
 
-    #         Args:
-    #             axis: AxisOrNone to aggregate along:
-    #                 - 0: Aggregate each column (default)
-    #                 - 1: Aggregate each row
+        Args:
+            axis: AxisOrNone to aggregate along:
+                - 0: Aggregate each column (default)
+                - 1: Aggregate each row
 
-    #         Returns:
-    #             Series: Series of lists containing quantiles
-    #         """
-    #         return self.agg(lambda values: statistics.quantiles(values, n=n, method=method), axis=axis)
+        Returns:
+            Series: Series of lists containing quantiles
+        """
+        return self.agg(lambda values: statistics.quantiles(values, n=n, method=method), axis=axis)
 
-    #     def std(self, xbar=None, axis: Axis = 0) -> Series | Scalar:
-    #         """
-    #         Return the sample standard deviation (the square root of the sample variance).
-    #         See variance() for arguments and other details.
+    def std(self, xbar=None, axis: Axis = 0) -> Series | Scalar:
+        """
+        Return the sample standard deviation (the square root of the sample variance).
+        See variance() for arguments and other details.
 
-    #         Args:
-    #             axis: AxisOrNone to aggregate along:
-    #                 - 0: Aggregate each column (default)
-    #                 - 1: Aggregate each row
+        Args:
+            axis: AxisOrNone to aggregate along:
+                - 0: Aggregate each column (default)
+                - 1: Aggregate each row
 
-    #         Returns:
-    #             Series: Standard deviations along axis
-    #         """
-    #         return self.agg(lambda values: statistics.stdev(values, xbar=xbar), axis=axis)
+        Returns:
+            Series: Standard deviations along axis
+        """
+        return self.agg(lambda values: statistics.stdev(values, xbar=xbar), axis=axis)
 
-    #     def var(self, xbar=None, axis: Axis = 0) -> Series | Scalar:
-    #         """
-    #         Return the sample variance of data, an iterable of at least two real-valued numbers.
-    #         Variance, or second moment about the mean, is a measure of the variability
-    #         (spread or dispersion) of data. A large variance indicates that the data is spread out;
-    #         a small variance indicates it is clustered closely around the mean.
+    def var(self, xbar=None, axis: Axis = 0) -> Series | Scalar:
+        """
+        Return the sample variance of data, an iterable of at least two real-valued numbers.
+        Variance, or second moment about the mean, is a measure of the variability
+        (spread or dispersion) of data. A large variance indicates that the data is spread out;
+        a small variance indicates it is clustered closely around the mean.
 
-    #         Args:
-    #             axis: Axis to aggregate along:
-    #                 - 0: Aggregate each column (default)
-    #                 - 1: Aggregate each row
+        Args:
+            axis: Axis to aggregate along:
+                - 0: Aggregate each column (default)
+                - 1: Aggregate each row
 
-    #         Returns:
-    #             Series: Variances along axis
-    #         """
-    #         return self._agg_with_none(lambda values: statistics.variance(values, xbar=xbar), axis=axis)
+        Returns:
+            Series: Variances along axis
+        """
+        return self._agg_with_none(lambda values: statistics.variance(values, xbar=xbar), axis=axis)
 
     #     ###########################################################################
     #     # Exports

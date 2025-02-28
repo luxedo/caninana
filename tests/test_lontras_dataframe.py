@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: MIT
 
+import statistics
 
 import pandas as pd
 import pytest
@@ -736,49 +737,49 @@ class TestDataFrameAccessors:
 #         assert_dataframe_equal_pandas(df.abs(), pdf.abs())
 
 
-# class TestDataFrameStatistics:
-#     @pytest.mark.parametrize(
-#         "func",
-#         [
-#             "mean",
-#             "median",
-#         ],
-#     )
-#     def test_statistics_axis_or_none(self, func):
-#         df = lt.DataFrame(example_list_dict)
-#         pdf = pd.DataFrame(example_list_dict)
-#         assert_series_equal_pandas(getattr(df, func)(), getattr(pdf, func)())
-#         assert_series_equal_pandas(getattr(df, func)(axis=0), getattr(pdf, func)(axis=0))
-#         assert_series_equal_pandas(getattr(df, func)(axis=1), getattr(pdf, func)(axis=1))
-#         assert (getattr(df, func)(axis=None) == float(getattr(pdf, func)(axis=None))) is True
+class TestDataFrameStatistics:
+    @pytest.mark.parametrize(
+        "func",
+        [
+            "mean",
+            "median",
+        ],
+    )
+    def test_statistics_axis_or_none(self, func):
+        df = lt.DataFrame(example_list_dict)
+        pdf = pd.DataFrame(example_list_dict)
+        assert_series_equal_pandas(getattr(df, func)(), getattr(pdf, func)())
+        assert_series_equal_pandas(getattr(df, func)(axis=0), getattr(pdf, func)(axis=0))
+        assert_series_equal_pandas(getattr(df, func)(axis=1), getattr(pdf, func)(axis=1))
+        assert (getattr(df, func)(axis=None) == float(getattr(pdf, func)(axis=None))) is True
 
-#     @pytest.mark.parametrize(
-#         "func",
-#         [
-#             "std",
-#             "var",
-#         ],
-#     )
-#     def test_statistics_axis(self, func):
-#         df = lt.DataFrame(example_list_dict)
-#         pdf = pd.DataFrame(example_list_dict)
-#         assert_series_equal_pandas(getattr(df, func)(), getattr(pdf, func)())
-#         assert_series_equal_pandas(getattr(df, func)(axis=0), getattr(pdf, func)(axis=0))
-#         assert_series_equal_pandas(getattr(df, func)(axis=1), getattr(pdf, func)(axis=1))
+    @pytest.mark.parametrize(
+        "func",
+        [
+            "std",
+            "var",
+        ],
+    )
+    def test_statistics_axis(self, func):
+        df = lt.DataFrame(example_list_dict)
+        pdf = pd.DataFrame(example_list_dict)
+        assert_series_equal_pandas(getattr(df, func)(), getattr(pdf, func)())
+        assert_series_equal_pandas(getattr(df, func)(axis=0), getattr(pdf, func)(axis=0))
+        assert_series_equal_pandas(getattr(df, func)(axis=1), getattr(pdf, func)(axis=1))
 
-#     def test_statistics_mode(self):
-#         # @TODO: This is a mess
-#         example_mode_input = [[0, 1, 1], [2, 2, 1], [3, 3, 2], [0, 0, 2], [1, 2, 1]]
-#         df = lt.DataFrame(example_mode_input)
-#         pdf = pd.DataFrame(example_mode_input)
-#         assert_series_equal_pandas(df.mode(axis=0), pdf.mode(axis=0).T[0].rename(None))
-#         assert_series_equal_pandas(df.mode(axis=1), pdf.mode(axis=1)[0].rename(None))
+    def test_statistics_mode(self):
+        # @TODO: This is a mess
+        example_mode_input = [[0, 1, 1], [2, 2, 1], [3, 3, 2], [0, 0, 2], [1, 2, 1]]
+        df = lt.DataFrame(example_mode_input)
+        pdf = pd.DataFrame(example_mode_input)
+        assert_series_equal_pandas(df.mode(axis=0), pdf.mode(axis=0).T[0].rename(None))
+        assert_series_equal_pandas(df.mode(axis=1), pdf.mode(axis=1)[0].rename(None))
 
-#     def test_statistics_quantiles(self):
-#         df = lt.DataFrame(example_list_dict)
-#         transposed = lt.DataFrame(example_list_dict).T.values
-#         assert df.quantiles(axis=0).values == [statistics.quantiles(row) for row in transposed]
-#         assert df.quantiles(axis=1).values == [statistics.quantiles(row.values()) for row in example_list_dict]
+    def test_statistics_quantiles(self):
+        df = lt.DataFrame(example_list_dict)
+        transposed = lt.DataFrame(example_list_dict).T.values
+        assert df.quantiles(axis=0).values == [statistics.quantiles(row) for row in transposed]
+        assert df.quantiles(axis=1).values == [statistics.quantiles(row.values()) for row in example_list_dict]
 
 
 # class TestDataFrameExports:
