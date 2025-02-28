@@ -2906,11 +2906,11 @@ class DataFrame:
         """
         match orient:
             case "dict":
-                return {col: s.to_dict() for col, s in self.T.iterrows()}
+                return dict(self.apply(lambda col: col.to_dict()).iteritems())
             case "list":
-                return {col: s.to_list() for col, s in self.T.iterrows()}
+                return dict(self.apply(lambda col: col.to_list()).iteritems())
             case "records":
-                return self.T.apply(lambda row: row.to_dict()).to_list()
+                return self.apply(lambda row: row.to_dict(), axis=1).to_list()
             case _:
                 msg = f"orient '{orient}' not understood"
                 raise ValueError(msg)
