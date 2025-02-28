@@ -954,13 +954,13 @@ class IlocSeriesIndexer(BaseIndexer["Series"]):
 class LocDataFrameIndexer(BaseIndexer["DataFrame"]):
     def __getitem__(self, key: LocIndexes | tuple[LocIndexes, LocIndexes]) -> Series | DataFrame:
         match key:
-            case (row_indexer, col_indexer):
+            case tuple([row_indexer, col_indexer]):
                 return self.frame.iloc[
                     self.frame.index.get_ilocs(row_indexer), self.frame.columns.get_ilocs(col_indexer)
                 ]
-            case (_, *_):
-                msg = "Onooooo"
-                raise ValueError(msg)
+            case tuple([_, *_]):
+                msg = f"{key!s}"
+                raise KeyError(msg)
             case indexer:
                 return self.frame.iloc[self.frame.index.get_ilocs(indexer)]
 
@@ -976,11 +976,11 @@ class IlocDataFrameIndexer(BaseIndexer["DataFrame"]):
         row_indexer: IlocIndexes
         col_indexer: IlocIndexes
         match key:
-            case (ri, ci):
+            case tuple([ri, ci]):
                 row_indexer, col_indexer = ri, ci
-            case (_, *_):
-                msg = "Onooooo"
-                raise ValueError(msg)
+            case tuple([_, *_]):
+                msg = f"{key!s}"
+                raise KeyError(msg)
             case _:
                 row_indexer = key
                 col_indexer = slice(None, None, None)
@@ -993,7 +993,7 @@ class IlocDataFrameIndexer(BaseIndexer["DataFrame"]):
         match (row_indexer, col_indexer):
             case (Array() | list() | slice(), Array() | list() | slice()):
                 return DataFrame(
-                    self.frame.values[row_indexer][col_indexer],
+                    [row[col_indexer] for row in self.frame.values[row_indexer]],
                     index=self.frame.index[row_indexer],
                     columns=self.frame.columns[col_indexer],
                 )
@@ -1006,7 +1006,7 @@ class IlocDataFrameIndexer(BaseIndexer["DataFrame"]):
                 rows = self.frame.values[row_indexer]
                 if len(rows) == 0:
                     return Series([], name=self.frame.columns[c])
-                return Series(rows[row_indexer], index=self.frame.index[row_indexer], name=self.frame.columns[c])
+                return Series([row[c] for row in rows], index=self.frame.index[row_indexer], name=self.frame.columns[c])
             case (r, c) if isinstance(r, int) and isinstance(c, int):
                 return self.frame.values[r][c]
             case _:

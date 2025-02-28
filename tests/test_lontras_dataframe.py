@@ -329,13 +329,13 @@ class TestDataFrameInit:
 
 
 class TestDataFrameAccessors:
-    def test_getitem_columns(self):
+    def test_getitem_scalar(self):
         df = lt.DataFrame(example_list_dict)
         pdf = pd.DataFrame(example_list_dict)
         key = "a"
-        assert df[key] == pdf[key]
+        assert_series_equal_pandas(df[key], pdf[key])
         key = "b"
-        assert df[key] == pdf[key]
+        assert_series_equal_pandas(df[key], pdf[key])
 
     def test_getitem_missing_column(self):
         df = lt.DataFrame(example_list_dict)
@@ -343,11 +343,11 @@ class TestDataFrameAccessors:
         key = "c"
         assert_exception(lambda: pdf[key], lambda: df[key], KeyError)
 
-    # def test_getitem_collection(self):
-    #     df = lt.DataFrame(example_list_dict)
-    #     pdf = pd.DataFrame(example_list_dict)
-    #     indexes = ["a", "b"]
-    #     assert_dataframe_equal_pandas(df[indexes], pdf[indexes])
+    def test_getitem_collection(self):
+        df = lt.DataFrame(example_list_dict)
+        pdf = pd.DataFrame(example_list_dict)
+        indexes = ["a", "b"]
+        assert_dataframe_equal_pandas(df[indexes], pdf[indexes])
 
     def test_getitem_slice(self):
         df = lt.DataFrame(example_list_dict)
@@ -360,25 +360,25 @@ class TestDataFrameAccessors:
         pdf = pd.DataFrame(example_list_dict)
         assert_dataframe_equal_pandas(df[0:1], pdf[0:1])
 
-    # def test_getitem_slice_too_many_indexers(self):
-    #     df = lt.DataFrame(example_list_dict)
-    #     pdf = pd.DataFrame(example_list_dict)
-    #     assert_exception(lambda: pdf[0, 1, 2], lambda: df[0, 1, 2], KeyError)
+    def test_getitem_slice_too_many_indexers(self):
+        df = lt.DataFrame(example_list_dict)
+        pdf = pd.DataFrame(example_list_dict)
+        assert_exception(lambda: pdf[0, 1, 2], lambda: df[0, 1, 2], KeyError)
 
-    # def test_getitem_mask(self):
-    #     df = lt.DataFrame(example_list_dict)
-    #     pdf = pd.DataFrame(example_list_dict)
-    #     val = 2
-    #     mask_df = df["a"] > val
-    #     mask_pdf = pdf["a"] > val
-    #     assert_dataframe_equal_pandas(df[mask_df], pdf[mask_pdf])
+    def test_getitem_mask(self):
+        df = lt.DataFrame(example_list_dict)
+        pdf = pd.DataFrame(example_list_dict)
+        val = 2
+        mask_df = df["a"] > val
+        mask_pdf = pdf["a"] > val
+        assert_dataframe_equal_pandas(df[mask_df], pdf[mask_pdf])
 
-    # def test_getitem_series(self):
-    #     df = lt.DataFrame(example_list_dict)
-    #     pdf = pd.DataFrame(example_list_dict)
-    #     indexes = lt.Series(df.columns[:1])
-    #     pindexes = pd.Series(pdf.columns[:1])
-    #     assert_dataframe_equal_pandas(df[indexes], pdf[pindexes])
+    def test_getitem_series(self):
+        df = lt.DataFrame(example_list_dict)
+        pdf = pd.DataFrame(example_list_dict)
+        indexes = lt.Series(df.columns[:1])
+        pindexes = pd.Series(pdf.columns[:1])
+        assert_dataframe_equal_pandas(df[indexes], pdf[pindexes])
 
     def test_loc_getitem_scalar(self):
         df = lt.DataFrame(example_list_dict)
