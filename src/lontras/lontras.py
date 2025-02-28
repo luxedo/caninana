@@ -2873,47 +2873,47 @@ class DataFrame:
         """
         return self._agg_with_none(lambda values: statistics.variance(values, xbar=xbar), axis=axis)
 
-    #     ###########################################################################
-    #     # Exports
-    #     ###########################################################################
-    # def to_list(self) -> list[list[Any]]:
-    #     """
-    #     Converts the DataFrame to a list.
+    ###########################################################################
+    # Exports
+    ###########################################################################
+    def to_list(self) -> list[list[Any]]:
+        """
+        Converts the DataFrame to a list.
 
-    #     Returns:
-    #         list[list[Any]]: A list of the Series values.
-    #     """
-    #     return list(self.apply(lambda s: s.values, axis=1).data.values())
+        Returns:
+            list[list[Any]]: A list of the Series values.
+        """
+        return list(self.apply(list))
 
-    #     @overload
-    #     def to_dict(self) -> dict[Scalar, dict[Scalar, Any]]: ...  # no cov
-    #     @overload
-    #     def to_dict(self, orient: Literal["dict"]) -> dict[Scalar, dict[Scalar, Any]]: ...  # no cov
-    #     @overload
-    #     def to_dict(self, orient: Literal["list"]) -> dict[Scalar, list[Any]]: ...  # no cov
-    #     @overload
-    #     def to_dict(self, orient: Literal["records"]) -> list[dict[Scalar, Any]]: ...  # no cov
-    #     def to_dict(self, orient: Literal["dict", "list", "records"] = "dict"):
-    #         """
-    #         Converts the DataFrame to a dictionary.
+    @overload
+    def to_dict(self) -> dict[Scalar, dict[Scalar, Any]]: ...  # no cov
+    @overload
+    def to_dict(self, orient: Literal["dict"]) -> dict[Scalar, dict[Scalar, Any]]: ...  # no cov
+    @overload
+    def to_dict(self, orient: Literal["list"]) -> dict[Scalar, list[Any]]: ...  # no cov
+    @overload
+    def to_dict(self, orient: Literal["records"]) -> list[dict[Scalar, Any]]: ...  # no cov
+    def to_dict(self, orient: Literal["dict", "list", "records"] = "dict"):
+        """
+        Converts the DataFrame to a dictionary.
 
-    #         Args:
-    #             orient str {`dict`, `list`, `records`}: Determines the type of the values of the
-    #                 dictionary.
+        Args:
+            orient str {`dict`, `list`, `records`}: Determines the type of the values of the
+                dictionary.
 
-    #         Returns:
-    #             dict[Scalar, Any]: A dictionary representation of the Series.
-    #         """
-    #         match orient:
-    #             case "dict":
-    #                 return self.apply(lambda s: s.to_dict()).data
-    #             case "list":
-    #                 return self.apply(lambda s: s.to_list()).data
-    #             case "records":
-    #                 return list(self.apply(lambda s: s.to_dict(), axis=1).values)
-    #             case _:
-    #                 msg = f"orient '{orient}' not understood"
-    #                 raise ValueError(msg)
+        Returns:
+            dict[Scalar, Any]: A dictionary representation of the Series.
+        """
+        match orient:
+            case "dict":
+                return {col: s.to_dict() for col, s in self.T.iterrows()}
+            case "list":
+                return {col: s.to_list() for col, s in self.T.iterrows()}
+            case "records":
+                return self.apply(lambda row: row.to_dict()).to_list()
+            case _:
+                msg = f"orient '{orient}' not understood"
+                raise ValueError(msg)
 
     ###########################################################################
     # Comparisons

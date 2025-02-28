@@ -63,7 +63,7 @@ Check out the [API Docs](https://lontras.readthedocs.io/en/latest/).
 ## Core Functionalities:
 
 Lontras prioritizes simplicity and minimal dependencies. It leverages Python's native dictionaries
-(via [UserDict](https://docs.python.org/3/library/collections.html#collections.UserDict)) to offer
+(via [UserList](https://docs.python.org/3/library/collections.html#collections.UserList)) to offer
 core `DataFrame` and `Series` functionalities without external libraries.
 
 ### Data Structures:

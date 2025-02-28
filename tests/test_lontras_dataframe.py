@@ -782,20 +782,20 @@ class TestDataFrameStatistics:
         assert df.quantiles(axis=1).values == [statistics.quantiles(row.values()) for row in example_list_dict]
 
 
-# class TestDataFrameExports:
-#     def test_to_list(self):
-#         df = lt.DataFrame(example_list_dict)
-#         pdf = pd.DataFrame(example_list_dict)
-#         assert df.to_list() == pdf.values.tolist()
+class TestDataFrameExports:
+    def test_to_list(self):
+        df = lt.DataFrame(example_list_dict)
+        pdf = pd.DataFrame(example_list_dict)
+        assert df.to_list() == pdf.values.tolist()
 
-#     def test_to_dict(self):
-#         df = lt.DataFrame(example_list_dict)
-#         pdf = pd.DataFrame(example_list_dict)
-#         assert df.to_dict() == pdf.to_dict()
-#         assert df.to_dict(orient="dict") == pdf.to_dict(orient="dict")
-#         assert df.to_dict(orient="list") == pdf.to_dict(orient="list")
-#         assert df.to_dict(orient="records") == pdf.to_dict(orient="records")
-#         assert_exception(lambda: pdf.to_dict(orient="error"), lambda: df.to_dict(orient="error"), ValueError)
+    def test_to_dict(self):
+        df = lt.DataFrame(example_list_dict)
+        pdf = pd.DataFrame(example_list_dict)
+        assert df.to_dict() == pdf.to_dict()
+        assert df.to_dict(orient="dict") == pdf.to_dict(orient="dict")
+        assert df.to_dict(orient="list") == pdf.to_dict(orient="list")
+        assert df.to_dict(orient="records") == pdf.to_dict(orient="records")
+        assert_exception(lambda: pdf.to_dict(orient="error"), lambda: df.to_dict(orient="error"), ValueError)
 
 
 class TestDataFrameComparisons:
