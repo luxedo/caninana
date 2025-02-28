@@ -60,6 +60,7 @@ def assert_index_equal_pandas(i: lt.Index, pi: pd.Index):
 
 
 def assert_scalar_equal(v0, v1):
+    # v1 may be a numpy scalar
     assert _is_scalar(v0)
-    assert _is_scalar(v1)
+    assert _is_scalar(v1) or np.isscalar(v1)
     assert v0 == v1

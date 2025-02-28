@@ -2465,9 +2465,9 @@ class DataFrame:
         self._validate_axis(axis)
         match axis:
             case int(c) if c == AxisRows:
-                return Series({col: method(s) for col, s in self.iterrows()})
+                return self.T.apply(method, axis=1)
             case int(c) if c == AxisCols:
-                return self.T.apply(method, axis=0)
+                return Series({col: method(s) for col, s in self.iterrows()})
             case unreachable:  # no cov
                 assert_never(unreachable)  # type: ignore # @TODO: How to exhaust this check?
 
@@ -2883,7 +2883,7 @@ class DataFrame:
         Returns:
             list[list[Any]]: A list of the Series values.
         """
-        return list(self.apply(list))
+        return list(self.T.apply(list))
 
     @overload
     def to_dict(self) -> dict[Scalar, dict[Scalar, Any]]: ...  # no cov
@@ -2910,7 +2910,7 @@ class DataFrame:
             case "list":
                 return {col: s.to_list() for col, s in self.T.iterrows()}
             case "records":
-                return self.apply(lambda row: row.to_dict()).to_list()
+                return self.T.apply(lambda row: row.to_dict()).to_list()
             case _:
                 msg = f"orient '{orient}' not understood"
                 raise ValueError(msg)
